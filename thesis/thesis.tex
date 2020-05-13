@@ -1,0 +1,45 @@
+\documentclass[11pt,a4paper,oneside,openright]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{mathtools}
+\usepackage{proof}
+\usepackage{todonotes}
+\usepackage[hidelinks=true]{hyperref}
+\usepackage{abstract}
+\usepackage{lmodern}
+\usepackage{titlesec, blindtext, color}
+
+
+\definecolor{gray75}{gray}{0.75}
+\newcommand{\hsp}{\hspace{20pt}}
+\titleformat{\chapter}[hang]{\Huge\bfseries}{\thechapter\hsp\textcolor{gray75}{|}\hsp}{0pt}{\Huge\bfseries}
+\setlength {\marginparwidth }{2cm}
+
+
+\begin{document}
+\title{Information Flow testing of a pgp server}
+\author{Lukas Johannes Rieger \\ \\
+    Software and Computational Systems Lab \\
+    Ludwig-Maximilians-Universität München \\
+
+}
+\date{\today}
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+\tableofcontents
+
+
+\include{chapters/intro}
+\include{chapters/general}
+\include{chapters/conclusion}
+
+
+\end{document}
