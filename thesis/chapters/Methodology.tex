@@ -1,0 +1,150 @@
+\section{Methodology}
+\subsection{Tools and technology used}
+\newpage
+\subsubsection{Property based testing with ScalaCheck}
+\newpage
+\subsection{General structure of the testing approach}
+The following chapters cover the approach chosen to test the information flow and declassification of PGP keys in the abstract server model as well as the actual HAGRID implementation. 
+
+\subsubsection{The abstract server model}
+In order to test the previously illustrated privacy constraints of PGP keys, we require a model of a PGP server which is sufficiently abstract to hide irrelevant implementation details, yet still exposes all functional specifications of the HAGRID server.
+
+A minimal representation of a secure PGP server according the the HAGRID specifications would therefore require the following operations:
+\begin{itemize}
+    \item \emph{Request adding a key} - Request adding a new key to the database. This key may potentially contain an arbitrary amount of associated identities. The uploaded key is not made publicly available immediately after uploading. Instead, the server issues a confirmation code that may be used in subsequent confirmation requests.
+    \item \emph{Confirm an addition} - Confirm a previously uploaded \emph{(Identity, Key)} pair given a valid confirmation code. This action does not directly confirm the selected identity but instead issues a confirmation email. The confirmation is only completed if the user uses the code contained within the email.
+    \item \emph{get(ByMail, ByFingerprint, ByKeyId)} - Retrieve a key from the database given some identifying index (e.g.the fingerprint of the PGP key or one of the associated identities).
+    \item \emph{Request a deletion} - Request the removal of some previously confirmed \emph{(Identity, Key)} pair. This action does not directly delete the selected identity but instead issues a confirmation email. The removal is only completed if the user uses the code contained within the mail.
+    \item \emph{Confirm a deletion} - Finalize the removal of some \emph{(Identity, Key)} pair. This operation requires the confirmation code, which the user must have obtained from a confirmation mail issued by the previous operation.
+\end{itemize}
+
+This minimal set of requirements allows for a relatively direct translation into source code. Our implementation in Scala bases its general server structure on the following trait definition: 
+
+\begin{lstlisting}[language=Scala]
+    trait HagridInterface {
+        def byEmail(identity: Identity): Option[Key]
+        def byFingerprint(fingerprint: Fingerprint): Option[Key]
+        def byKeyId(keyId: KeyId): Iterable[Key]
+        def upload(key: Key): Token
+        def requestVerify(from: Token, emails: Set[Identity]): Seq[Body]
+        def verify(token: Token)
+        def requestManage(identity: Identity): Option[EMail]
+        def revoke(token: Token, emails: Set[Identity])
+    }
+\end{lstlisting}
+
+Where the datatypes \emph{Fingerprint} and \emph{KeyId} represent the concepts as defined in the OpenPGP message format according to \cite{callas1998openpgp}. The \emph{Identity} type serves as a simple wrapper for a string containing an email address. \emph{Key} is a type that can generally be defined as: 
+\begin{lstlisting}[language=Scala]
+    trait Key {
+        def keyId: KeyId
+        def fingerprint: Fingerprint
+        def identities: Set[Identity]
+    }
+\end{lstlisting}
+thus combining the previously mentioned types into what our server model will treat as a representation of a full PGP key.
+\\ \\
+The implementation of this trait that we chose to use as a basis for our tests is non permanent. Specifically, the model state is kept as a set of maps whose elements transition between each other: 
+\begin{lstlisting}[language=Scala]
+    class Server extends HagridInterface {
+        var keys: Map[Fingerprint, Key]
+        var uploaded: Map[Token, Fingerprint]
+        var pending: Map[Token, (Fingerprint, Identity)]
+        var confirmed: Map[Identity, Fingerprint]
+        var managed: Map[Token, Fingerprint]
+        ...
+    }
+\end{lstlisting}
+
+\textbf{TODO}: Should I explain exactly how upload/manage etc. modify the server state ?
+
+\subsubsection{Simulating actions and responses}
+The server model itself cannot execute any relevant actions without some accompanying actor that causes this action. The following sections will explore two different approaches to simulating user actions, that were considered during development. \\
+In general, we wanted to express the following abstract actions in a composable way: 
+\begin{itemize}
+    \item \emph{Upload some key \textbf{k} to the server}
+    \item \emph{Verify some identity \textbf{i} in relation to some parent key \textbf{k}}
+    \item \emph{Revoke some verified identity \textbf{i} from its parent key \textbf{k}}
+    \item \emph{Request some key \textbf{k} from the server, using one of its identifying characteristics}
+\end{itemize}
+Notize how these operations closely align with those defined by the server model.
+\\ \\
+Our test approach is based on \emph{Histories} that record events of the interaction explicitly, but not the internal states of the stateful actors.
+These histories are created by custom ScalaCheck generators with respect to a small collection of known email addresses.
+Three types of events can occur: upload of a key, and confirmation resp. revocation of the association between an email address and a key (via its fingerprint that is supposed to be unique).
+
+The top-level specification is expressed over histories, which precisely determines those associations that are intended to be visible to another user of HAGRID (i.e. the adversary).
+To test whether an actual execution is correct and secure we thus compare the intended status of each \emph{potential} association from the predetermined set of identities and keys to the actual observations that can be made by calling server operations.
+
+\subsubsection{Initial approach to simulating actions through ``actors''}
+Our initial approach to simulating user actions was based on fine grained \emph{actors} that each encapsulated a specific capability. 
+Using this approach, any of the aforementioned operations would be represented by a single actor that runs on a simple state machine.
+The actor trait is defined as following:
+\begin{lstlisting}[language=Scala]
+    trait Actor {
+        def canAct: Boolean
+        def act(): Unit
+      
+        val inbox = mutable.Queue[Data]()
+        def canReceive = inbox.nonEmpty
+      
+        def isActive = canAct || canReceive
+      
+        def handle(from: Actor, msg: Message)
+        def handle(from: Actor, msg: Body)
+        def send(to: Actor, msg: Message): Unit = 
+            Network.send(this, to, msg)
+        def send(to: Identity, msg: Body): Unit = 
+            Network.send(this, to, msg)
+      
+        def register(identity: Identity): Unit = 
+            Network.register(identity, this)
+    }
+\end{lstlisting}
+An actor could define a custom \emph{act()} method that would initialize the specific action of this actor. Any future interaction with another actor would then be handled by the actors \emph{handle()} method. 
+
+\textbf{TODO}: Describe why there were two different handle methods. What is Network? What was bad about this approach? Show execution strategy and why order of execution was a problem.
+
+\newpage
+\subsubsection{Arbitrarily sized histories of events}
+To overcome the complications of our initial approach, specifically the inability to define the \emph{execution order} in a simple and expressive way, we were forced to reconsider the usage of actors in terms of user actions.
+
+As an alternative, we introduce the notion of a sequential \emph{history} of events that represent interactions between a user and the PGP server.
+Through this method we can define a high level model of \emph{what} operations should be executed in a specific order while keeping the \emph{how}, i.e. the concrete execution strategy, completely separate.
+
+Once again, the different kinds of events are closely related to the capabilities exposed by our server model. Specifically, we recognise three distinct event types, that are modelled as subclasses of a \lstinline{sealed trait Event}: 
+\begin{lstlisting}[language=Scala]
+case class Revoke(ids: Set[Identity], fingerprint: Fingerprint) 
+    extends Event
+
+case class Upload(key: Key) extends Event
+
+case class Verify(ids: Set[Identity], fingerprint: Fingerprint) 
+    extends Event
+\end{lstlisting}
+
+Given some history of arbitrary length, we can now define a simple execution strategy that sequentially runs the given history and sends the corresponding data the server.
+The signature of the execution algorithm is given by \lstinline{def execute(server: HagridInterface, history: History): Unit}. The method then simply loops through 
+
+\newpage
+
+\subsubsection{History evaluation strategies}
+Given some history \emph{h} we want to determine precisely which associations between identities and keys should be visible depending on the combination of events in the history.
+To determine the visibility of an identity at any time, we introduce a \emph{State} type, that tags the current state of an identity throughout the evaluation of the history.
+The state of an identity may take any of these three forms: 
+\begin{itemize}
+    \item Public: The identity has been confirmed and therefore publicly visible
+    \item Private: The identity has not been confirmed yet and therefore remains private
+    \item Revoked: The identity had been confirmed at some prior point in the history but has since been revoked.
+\end{itemize}
+In terms of visibility, a \emph{Private} identity and a \emph{Revoked} identity can be considered equal from the perspective of a user. In both cases, the identity should not be included in any key requests.
+
+In order to determine these states for every possible identity, we define a method \lstinline{def states: Map[Fingerprint, Set[(Identity, Status)]]} on \emph{History}.
+The method starts off with three separate maps \emph{Uploaded}, \emph{Confirmed} and \emph{Revoked}. These maps are then populated by folding of the sequence of history events.
+Depending on the currently folded over value, one or several of the maps will be updated. 
+
+\textbf{TODO}: This explanation is currently pretty bad and unfinished.
+\textbf{TODO}: Maybe illustrate this with a diagram? Visualize the maps and how a event can change one or more of them.
+
+\newpage
+\subsection{Testing the real-world implementation of HAGRID}
+\newpage

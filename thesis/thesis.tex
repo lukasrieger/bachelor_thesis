@@ -1,45 +1,122 @@
-\documentclass[11pt,a4paper,oneside,openright]{report}
-
+\documentclass{article}
 \usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[scaled=0.8]{beramono}
+\usepackage{graphicx}
+\usepackage[pages=some]{background}
+\usepackage[nottoc]{tocbibind}
+\usepackage{fancyhdr}
+\usepackage{cmap}
+\usepackage[english,ngerman]{babel}
+\usepackage{iflang}
+\usepackage{hyperref}
+\usepackage{listings}
 \usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{stmaryrd}
-\usepackage{mathtools}
-\usepackage{proof}
-\usepackage{todonotes}
-\usepackage[hidelinks=true]{hyperref}
-\usepackage{abstract}
-\usepackage{lmodern}
-\usepackage{titlesec, blindtext, color}
 
 
-\definecolor{gray75}{gray}{0.75}
-\newcommand{\hsp}{\hspace{20pt}}
-\titleformat{\chapter}[hang]{\Huge\bfseries}{\thechapter\hsp\textcolor{gray75}{|}\hsp}{0pt}{\Huge\bfseries}
-\setlength {\marginparwidth }{2cm}
+\lstset{language=Scala}
 
+\backgroundsetup{
+firstpage=true,
+placement=bottom,
+scale=1,
+color=black,
+opacity=0.4,
+angle=0,
+contents={%
+  \makebox[\paperwidth]{\hspace*{\fill}\includegraphics[width=.6\paperwidth]{images/lmu_seal}}%
+  }%
+}
+
+\widowpenalty10000
+\clubpenalty10000
 
 \begin{document}
-\title{Information Flow testing of a pgp server}
-\author{Lukas Johannes Rieger \\ \\
-    Software and Computational Systems Lab \\
-    Ludwig-Maximilians-Universität München \\
 
-}
+\input{config}
+
+\let\oldcontentsname\contentsname
+\renewcommand{\contentsname}{\centering\small\oldcontentsname}
+
+\title{\thesistitle}
+\author{\authorA \IfLanguageName{ngerman}{und}{and} \authorB}
 \date{\today}
-\maketitle
 
+\begin{titlepage}
+	\centering
+    \BgThispage
+    \vspace*{-\topmargin}\vspace{-1in}%
+    \vspace*{-\headheight}\vspace{-\headsep}%
+    \vspace*{-\topskip}%
+    \hspace*{-\oddsidemargin}
+    \hspace*{-\marginparsep}
+    \hspace*{-\marginparwidth}
+    %\hspace{\textwidth}%
+	\makebox[\paperwidth]{\centering\includegraphics[width=.95\paperwidth]{images/lmu_header}}
+	\vspace*{1.75cm}
+	\par
+    {\huge\bfseries\thesistitle\par}
+    \noindent\rule{\textwidth}{0.3pt} 
+    {\LARGE\bfseries Bachelorarbeit \par}
+	\vspace*{1.75cm}
+	\large \begin{tabular}{ l l }
+	  \textsc{Bearbeiter}:&{\thesisauthor}
+	  \\
+	  \textsc{Betreuer:}&{\supervisor}\\
+	  \\
+	\end{tabular}
+	\par
+	\vspace*{1.75cm}
+	\begin{otherlanguage}{ngerman}
+		{\large Dokument erstellt\par\today\par}
+	\end{otherlanguage}
+	\newpage
+	\thispagestyle{empty}
+	\mbox{}
+	\newpage
+\end{titlepage}
+\cleardoublepage
+\begin{center}
+    \section*{Statement of Authorship}
+    \thesisauthorship
+
+    \vspace*{4em}\noindent
+\hfill%
+\begin{tabular}[t]{c}
+  \rule{10em}{0.4pt}\\ Place and date
+\end{tabular}%
+\hfill%
+\begin{tabular}[t]{c}
+  \rule{10em}{0.4pt}\\ Signature
+\end{tabular}%
+\hfill\strut
+    
+\end{center}
+\newpage
+
+\begin{center}
+	\LARGE
+	\thesistitle
+\end{center} 
+\vspace*{.75cm}
 \begin{abstract}
-
+\noindent\thesisabstract
 \end{abstract}
+\vspace*{.75cm}
 \tableofcontents
+\newpage
+\thispagestyle{empty}
+\mbox{}
+\newpage
+\cleardoublepage
 
+\input{content}
 
-\include{chapters/intro}
-\include{chapters/general}
-\include{chapters/conclusion}
+\listoffigures
+\newpage
 
+\listoftables
+\newpage
 
-\end{document}
+\bibliography{references}
+\bibliographystyle{apalike}
+
+\end{document} 
