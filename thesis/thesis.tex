@@ -10,21 +10,26 @@
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{amsmath}
+\usepackage{minted}
+\usepackage{todonotes}
 
 
 \lstset{language=Scala}
 
-\backgroundsetup{
-firstpage=true,
-placement=bottom,
-scale=1,
-color=black,
-opacity=0.4,
-angle=0,
-contents={%
-  \makebox[\paperwidth]{\hspace*{\fill}\includegraphics[width=.6\paperwidth]{images/lmu_seal}}%
-  }%
-}
+% workaround to remove "draft" background...
+\backgroundsetup{contents={}}
+
+% \backgroundsetup{
+% firstpage=true,
+% placement=bottom,
+% scale=1,
+% color=black,
+% opacity=0.4,
+% angle=0,
+% contents={%
+%   \makebox[\paperwidth]{\hspace*{\fill}\includegraphics[width=.6\paperwidth]{images/lmu_seal}}%
+%   }%
+% }
 
 \widowpenalty10000
 \clubpenalty10000
@@ -110,11 +115,11 @@ contents={%
 
 \input{content}
 
-\listoffigures
-\newpage
+% \listoffigures
+% \newpage
 
-\listoftables
-\newpage
+% \listoftables
+% \newpage
 
 \bibliography{references}
 \bibliographystyle{apalike}

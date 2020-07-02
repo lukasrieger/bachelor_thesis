@@ -1,0 +1,78 @@
+\section{Testing the real-world implementation of HAGRID}
+Given that we had successfully developed a working testing framework for our abstract model, we decided to integrate the actual HAGRID server into our testing efforts.
+For obvious reasons, testing HAGRID requires a local server instance to be running on the same machine. 
+
+\paragraph{Communicating with HAGRID}
+The main effort of integrating HAGRID into our implementation focussed on the relaying and receiving of messages between our Scala frontend and HAGRID.
+To this end, we use \emph{Sttp}, which is a simple library that enables us to communicate with the server through REST-full http calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe} as a library.
+
+HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}, exposes the following endpoints: 
+\begin{itemize}
+    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-fingerprint/FINGERPRINT}
+    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-keyid/KEY-ID}
+    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-email/URI-ENCODED EMAIL-ADDRESS}
+    \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/upload}
+    \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/request-verify}
+\end{itemize}
+
+The interface which actually communicates with the server exposes exactly the same methods as our model, due to it implementing the same 
+\mintinline{scala}{HagridInterface}.
+
+Instead of keeping track of keys and identities in the frontend, our \mintinline{scala}{HagridServer} simply relays all actions to HAGRID by http.
+As an example, lets look at the \mintinline{scala}{upload} method once again: 
+\begin{minted}{scala}
+    override def upload(key: Key): Token = {
+        val response = basicRequest
+            .post(hag("/vks/v1/upload"))
+            .body(UploadBody(key.armored))
+            .response(asJson[UploadResponse])
+            .send()
+            .body
+ 
+        Token(response
+        .toOption
+        .get
+        .token)
+  }
+\end{minted}
+First, we construct a simple \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
+The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token, which we require in order to send any verification requests at a later point.
+
+However, it must be noted that our implementation, while fully working, generally \emph{ignores} the possibility of an error occurring while communicating with HAGRID. We are aware that this may cause unforeseen problems in the future.
+
+\subsection{Receiving verification mails from HAGRID}
+While we were able to simulate the transmission of verification mails in an abstract and direct way for our server model, we had no such option when dealing with the real-world HAGRID server. 
+
+During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} command to be available in the environment in order to send and receive mails.
+Luckily, we discovered that HAGRID also provides an alternative mode of operation, in which all email transfer is handled directly through the filesystem.
+Modifying the configuration file \mintinline{text}{Rocket.toml} and adding the line \mintinline{text}{mail_folder=/PATH/TO/MAIL}, causes HAGRID to write all mails to a unique file in the specified folder.
+
+This allows us to simply observe the given directory and react to any file modifications within the folder.
+More specifically, we defined a method, that would block its execution until it successfully read all expected mails: 
+\begin{minted}{scala}
+    private def consumeMail(expectedSize: Int): Seq[Body] = {
+        val watchKey = mailWatcher.take
+        val events = watchKey.pollEvents.asScala
+        val updatePaths = events
+            .take(expectedSize)
+            .map(_.asInstanceOf[WatchEvent[Path]])
+            .map(_.context())
+
+        val mails = updatePaths.flatMap { currentPath =>
+            val resolved = mailPath.resolve(currentPath).toFile
+            val source = Source.fromFile(resolved)
+            val bodies: Seq[Body] = parseMail(source.mkString)
+            source.close
+            resolved.delete
+            val isValid = watchKey.reset
+            bodies
+        }
+        mails
+  }
+\end{minted}
+\todo{There is more to this than just consumeMail()! Explain parseMail() as well!}
+
+\subsection{Generating valid PGP keys}
+\newpage
+\subsection{Technical challenges}
+\newpage
