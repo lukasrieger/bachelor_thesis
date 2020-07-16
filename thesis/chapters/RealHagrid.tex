@@ -152,7 +152,7 @@ The general signature to generate a PGP key is as following:
 \end{minted}
 It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable.
 \newpage
-\subsection{Technical challenges}
+\subsection{Initializing}
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
 In contrast to this, our high level model of HAGRID maintains no state at all between any two separate test runs.
 

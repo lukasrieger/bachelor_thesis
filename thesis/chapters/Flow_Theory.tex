@@ -2,7 +2,7 @@
 \section{Information Flow Theory} 
 The following sections give a brief introduction to the general notion of \emph{security} in regards to the concept of information in computational systems.
 Building upon this, we then focus specifically on the key concepts of non-interference and declassification as they relate to the notion of information flow.
-\paragraph{Security models and policies}
+\subsection{Security models and policies}
 Many modern computational systems will at some point have to handle certain kinds of information, which must never be accessible to an \emph{unauthorized} entity.
 A popular description for a system, which keeps its information from leaking to the outside or any unintended entity/process can be found in the term of a  \emph{secure} system.
 In this context, ``security'' or ``secure information flow'' means, that "no unauthorized flow of information is possible" \cite{lattice_model_security}.
@@ -11,7 +11,7 @@ While such a general definition may be relatively easy to arrive at, actually \e
 In order to properly define which information may flow in what way within a part of a program or between programs, a common approach is to specify the individual components, between which a flow of information may occur and consequently assigning certain security \emph{levels} to these individual constituents. This approach can for example be found in \cite{lattice_model_security} by \citeauthor{lattice_model_security}, in which the concept of \emph{security classes} \(SC\) is introduced. These classes can then be bound to any information receptacles or ``objects'' in order to denote their respective security clearance.
 \todo{This chapter is way too short at the moment.}
 \todo{Mention, that the lattice model is very widespread and fundamental. Tie into this later aswell. (Public/Private can be seen as a binary lattice model.)}
-\paragraph{Non-interference and Declassification}
+\subsection{Non-interference and Declassification}
 \label{ref:Declass_and_Inter}
 An important concept in terms of secure systems that can be operated by multiple users either simultaneously or sequentially, is the concept of \emph{non-interference}.
 \begin{quotation}
@@ -59,4 +59,3 @@ The second \(get\) request now yields a different response as before. Instead of
 \todo{Quote Security Policies and Security Models for their definition of non-interference}
 
 \newpage
-
