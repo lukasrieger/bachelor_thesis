@@ -49,6 +49,7 @@ Modifying the configuration file \mintinline{text}{Rocket.toml} and adding the l
 
 This allows us to simply observe the given directory and react to any file modifications within the folder.
 More specifically, we defined a method, that would block its execution until it successfully read all expected mails: 
+\label{code:consumeMail}
 \begin{minted}{scala}
     private def consumeMail(expectedSize: Int): Seq[Body] = {
         val watchKey = mailWatcher.take
@@ -70,9 +71,118 @@ More specifically, we defined a method, that would block its execution until it 
         mails
   }
 \end{minted}
-\todo{There is more to this than just consumeMail()! Explain parseMail() as well!}
+where the returned sequence of mail bodies takes the form of:
+\begin{minted}{scala}
+    case class Body(fingerprint: Fingerprint, token: Token, identity: Identity)
+\end{minted}
+
+\paragraph{Parsing plain text confirmation mails}
+In order to consume the emails within the selected directory and actually use the information contained within them, we had to parse the plain text content of said mails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and finally the respective \mintinline{scala}{Identity} in concern.
+
+For example, a typical mail issued by HAGRID (running as a local instance) in repsonse to a confirmation request might look like this: 
+\begin{minted}{text}
+    To: <ISSUE_EMAIL@ADDRESS> 
+    Hi,
+   
+    Dies ist eine automatische Nachricht von localhost.
+    Falls dies unerwartet ist, bitte die Nachricht ignorieren.
+   
+    OpenPGP Schlüssel: 23B2E0C54487F50AC59134C3A1EC9765D7B25C5A 
+   
+    Damit der Schlüssel über die Email-Adresse "<ISSUE_EMAIL@ADDRESS>" gefunden werden kann,
+    klicke den folgenden Link:
+   
+    http://localhost:8080/verify/vrTohvV8q552KMvARBE7foqkvGtUrfDl3iiyX9yqeOX 
+   
+    Weitere Informationen findest du unter http://localhost:8080/about
+
+\end{minted}
+\todo{This mail should be in english as well.}
+
+We currently use a regular expression to parse the relevant information from these mails. This functionality is summarized in a method \mintinline{scala}{parseMail}:
+\begin{minted}{scala}
+    val VERIFY_PATTERN: Regex = 
+        "(?s).*To: <(\\S+)>.*OpenPGP key: ||
+        (\\S+).*http://localhost:8080/verify/(\\S+).*<!doctype html>.*".r
+
+    def parseMail(mail: String): Seq[Body] =
+        decode[HagridMail](mail)
+            .map(mail => new String(mail.message))
+            .map {
+            case REVOKE_PATTERN(identity, fingerprint, token) => 
+                Body(FingerprintImpl(fingerprint), Token(token), PgpIdentity(identity))
+            case VERIFY_PATTERN(identity, fingerprint, token) => 
+                Body(FingerprintImpl(fingerprint), Token(token), PgpIdentity(identity))
+            }
+            .toSeq
+\end{minted}
+As seen in the code sample in \ref{code:consumeMail}, this function is responsible for parsing the mails, that \mintinline{scala}{consumeMail} read from the dedicated mail directory.
 
 \subsection{Generating valid PGP keys}
+While our testing efforts were mainly focussed on our own abstract model, we were able to use a simplified representation of our \mintinline{scala}{Key} datatype to represent a PGP key. 
+\begin{minted}{scala}
+    sealed trait Key {
+        def armored: String
+        def keyId: KeyId
+        def fingerprint: Fingerprint
+        def identities: Set[Identity]
+        def restrictedTo(ids: Set[Identity]): Key
+    }
+\end{minted} 
+For example, \mintinline{scala}{keyId} simply consists of a unique string identifier that does not hold any specific meaning:
+\begin{minted}{scala}
+    sealed trait KeyId {
+        def value: String
+    }
+    case class KeyIdImpl(id: String) extends KeyId {
+        def value: String = id
+    }
+    object KeyId {
+        def random: KeyId = KeyIdImpl(UUID.randomUUID().toString)
+    }
+\end{minted}
+In order to transmit any \mintinline{scala}{Key} values to the actual HAGRID server, we couldn't rely on the existing dummy implementation, as HAGRID would reject any PGP key that is not properly formatted.
+
+In order to solve this problem, we decided to implement a mechanism that is capable of generating valid PGP keys. 
+For this purpose, we use \emph{BouncyCastle}, which is a Java library for cryptographic use cases.
+
+The general signature to generate a PGP key is as following: 
+\begin{minted}{scala}
+    def genPublicKey(identities: Set[Identity]): (PGPPublicKey, String)
+\end{minted}
+It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable.
 \newpage
 \subsection{Technical challenges}
-\newpage
+One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
+In contrast to this, our high level model of HAGRID maintains no state at all between any two separate test runs.
+
+This is problematic, because our testing approach fundamentally relies on a limited amount of \emph{Identities}, that are subsequently used to construct PGP Keys. This would necessarily lead to unexpected results when applying our approach to HAGRID, where there could potentially already be an identity associated to some PGP key, that was uploaded during a previous testing session. 
+To elaborate on this problem, let us assume these two separate test runs in pseudo-code:
+
+Assuming that there exists a value \mintinline{scala}{key1 = Key(identity1,identity2)} and a value \mintinline{scala}{key2 = Key(identity3,identity4)}
+ where all arguments to the \mintinline{scala}{Key} constructor are instances of \mintinline{scala}{Identity} with an arbitrary email address, we can define the following two test runs: 
+\begin{figure}[!h]
+    \begin{minipage}{0.5\textwidth}
+        \centering
+        \begin{minted}{scala}
+        upload(key1)
+        verify(identity1)
+        \end{minted}
+        \title{listing}{\textbf{Test run 1}}
+    \end{minipage}
+    \begin{minipage}{0.5\textwidth}
+        \centering
+        \begin{minted}{scala}
+        verify(identity1)
+        upload(key2)
+        \end{minted}
+        \title{listing}{\textbf{Test run 2}}
+    \end{minipage}
+\end{figure}
+
+Looking \emph{only} at test run 2 we would expect an outcome, in which the server returns no public keys/identities at all. Instead, when we actually execute these two runs in sequential order, we receive a PGP key when querying the server with \mintinline{scala}{identity1}, even though we \emph{never} uploaded it during the second test. 
+Any solution to this problem therefore requires us to reset the internal state of HAGRID after having completed a test.
+This in turn also imposes an additional non trivial performance penalty on the execution speed of our ScalaCheck test, besides the slowdown caused by having to generate real PGP keys. 
+For our current solution to this problem, we decided to compile HAGRID into a static image. This allows us to create a fresh instance of HAGRID at the beginning of each test iteration and shutting it down afterwards, at which point we simply clear the local directory of PGP keys. This ensures that each test run starts on a truly equal playing field.
+
+
