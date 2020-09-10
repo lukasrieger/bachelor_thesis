@@ -41,7 +41,7 @@ Based on this, we can image the following, highly simplified interaction between
     \caption{A non-interfering interaction}
 \end{figure}
 
-The second call of \(u2\) in this sequence is a key request for identity \(id1\), which belongs to the previously uploaded key \(k1\). Yet, because the identity had not been verified when \(u2\) issued its key request, the resulting response will be empty. That means, that the actions of \(u1\) hat no effect \emph{at all} on the experience of \(u2\). 
+The second call of \(u2\) in this sequence is a key request for identity \(id1\) which belongs to the previously uploaded key \(k1\). Yet, because the identity had not been verified when \(u2\) issued its key request, the resulting response will be empty. That means, that the actions of \(u1\) hat no effect \emph{at all} on the experience of \(u2\). 
 As a matter of fact, based on the interactions with HAGRID alone, \(u2\) has no way of identifying whether there even \emph{is} another user currently interacting with the same system. 
 In contrast to that, let us assume that this sequence of interactions is continued in the following way: 
 \begin{figure}[H]
@@ -51,7 +51,14 @@ In contrast to that, let us assume that this sequence of interactions is continu
     \caption{The interaction has become interfering}
 \end{figure}
 
-The second \(get\) request now yields a different response as before. Instead of an empty response, \(u2\) now receives a key with an identity. This change in behaviour was caused by \(u1\) through issuing a verification for \(id1\). Therefore, the actions of \(u1\) were able to influence the sequence of interactions between \(u2\) and HAGRID, which causes this interaction to no longer be \emph{non-interfering}.
+The second \(get\) request now yields a different response as before. Instead of an empty response, \(u2\) now receives a key with an identity. This change in behaviour was caused by \(u1\) issuing a verification for \(id1\). Therefore, the actions of \(u1\) were able to influence the sequence of interactions between \(u2\) and HAGRID, which causes this interaction to no longer be \emph{non-interfering}. \\ \\
+
+Given this definition of non-interference, it can be trivially concluded that a strict enforcement of this principle would render most information systems practically unusable.
+Instead, what we need is a formal mechanism to determine the circumstances under which the release of classified information is permissible. As mentioned in \cite{declass_dim_prin}, one key concern of any system that permits the declassification of private information is, whether that release is actually \emph{safe}. That means, whether the introduction of additional declassification policies would allow an attacker to obtain more information from the given system than intended by its designers.
+\\
+This safety concern has given rise to a multitude of different approaches, which aim at formally verifying the correct flow and release of information. Some of these approaches will be briefly laid out in chapters \ref{sec:related_work} and \emph{REF TODO}.
+\\ \\
+However, the central approach of this thesis will specifically focus on the testing of \emph{dynamic} information flow policies.
 
 \textbf{TODO: Why is this too strict? Examples.}
 \textbf{TODO: How does declassification work?}

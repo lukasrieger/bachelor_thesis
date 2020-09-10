@@ -25,6 +25,65 @@ Specifically, our goal is to run a symbolic execution of a history, which ultima
 
 \paragraph{A formal description of history evaluation}
 \label{sec:history_def}
+
+Evaluation of arbitrary histories can be formally approximated by a set of state machines \(S_i\). Each state machine tracks the visibility state of its associated identity \(i\).
+
+In order to show how this formalization works, let us first look at a simpler case, where we only consider histories of events that affect a single key with only one associated identity. 
+
+We can then define a state machine \(S\) which is a quintuple \((\Sigma,Q,s_0,\delta,F)\), where:
+\begin{itemize}
+    \item \(\Sigma\) is the input alphabet given by the set \(\{\text{Upload},\text{Verify},\text{Revoke}\}\), corresponding to our history event types;
+    \item \(Q\) is the finite set of states \(\{\Theta,U,C,R\}\);
+    \item \(s_0\) is the initial state of any identity, denoted as \(\Theta\);
+    \item \(\delta\) is the state transition function, defined by the following state transitions:
+    \begin{equation}
+        \begin{aligned}
+            &\Theta \xrightarrow{\text{Upload}}U \\
+            &U \xrightarrow{\text{Verify}}C \\
+            &C \xrightarrow{\text{Revoke}}R \\
+            &R \xrightarrow{\text{Verify}}C
+        \end{aligned}
+    \end{equation}
+    \item F is the empty set of final states
+\end{itemize}
+
+The states of this state machine represent the privacy state after each transition, where a transition to \(U\) means, that the given identity has been uploaded, yet remains undiscoverable until further state changes. The \(C\) state occurs, when the given identity gets verified and therefore publicly available, whereas the \(R\) state describes the exact opposite, the given identity is private must first be re-verified to become available again.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2.8cm,semithick]
+    
+        \node[initial, state] (A)   {$\Theta$};
+        \node[state]          (B) [above right of=A]   {$U$};
+        \node[state]          (C) [below right of=B]   {$C$};
+        \node[state]          (D) [below right of=A]   {$R$};
+    
+        \path   (A)     edge               node {Upload}          (B)
+                        edge [loop below]  node {Revoke,Verify}   (A)
+                (B)     edge               node {Verify}          (C)
+                        edge [loop right]  node {Revoke,Upload}   (B)
+                (C)     edge [loop right]  node {Verify,Upload}   (C)
+                        edge [bend left]   node {Revoke}          (D)
+                (D)     edge [loop below]  node {Revoke,Upload}   (D)
+                        edge [bend left]   node {Verify}          (C);
+    
+    \end{tikzpicture}
+    \caption{Visualization of the single key/identity state machine}
+\end{figure}
+
+
+
+
+We can now generalize this state machine to support histories containing arbitrary amounts of keys and identities. Let's consider the set of state machines \(\{S_{i,k}\}\), where all state machines share their set of states and initial state with \(S\). 
+
+Given some event \(E_{i,k}\) and some state \(s \in Q\), we define \( \exists {s'} \subseteq \delta_{i',k'}(E_{i',k'},s) \) if, and only if \( \exists S_{i',k'} .\, i' = i \wedge k' = k\).
+Finally, it is easy to see, that any event \(E(t,f)\), where \(t\) is a set of identities can also be denoted as the set \(E' = \{E_{t_i,f} | t_i \in t\} \). That means, that any event that affects multiple identities at once can be equivalently formulated as a sequence of the same event that each affects a single event from the original set.
+
+
+
+\textbf{TODO: Write down all state transitions.}
+
+
 The first step of evaluating a history requires us to divide the data contained in the history into three distinct maps \(U,C\) and \(R\), where \(U\) holds an entry for every uploaded key mapping the fingerprint to the key itself. \(C\) then maps each identity which remains \emph{confirmed} at the end of the history to the fingerprint of its parent key. \(R\) on the other hand, maps all identities which remain revoked to its parent key.
 
 Formally, these three sets can now be defined as: 
@@ -41,7 +100,7 @@ Formally, these three sets can now be defined as:
     \phi(i,H_n) = \exists e_t\in H(\text{Verify}) ( i \in e.ids \wedge (\forall e_k \in H(\text{Revoke}) k < i  ))
 \end{equation}
  
-As an end result, we want to obtain a map, that associates the fingerprint of every uploaded key to a set of \mintinline{scala}{(Identity,Status)} tuples. In this case, \mintinline{scala}{Status} indicates the visibility of the associated identity, which may take either of the following three values: 
+Ultimately, we want to obtain a map, that associates the fingerprint of every uploaded key to a set of \mintinline{scala}{(Identity,Status)} tuples. In this case, \mintinline{scala}{Status} indicates the visibility of the associated identity, which may take either of the following three values: 
 \begin{itemize}
     \item \emph{Public} -- The identity has been declassified and can be made publicly available.
     \item \emph{Private} -- The identity remains classified and must therefore not be leaked by the server.
@@ -74,10 +133,11 @@ The algorithm for testing HAGRID can then be summarized as:
 \end{enumerate}
 
 \paragraph{Determining invalid associations}
-Focusing on the last, third step, all that is left now is to compute all differing entries. Given that the format of both structures is very similar, this process is very straight forward.
+Focusing on the last step, all that is left now is to compute all differing entries. Given that the format of both structures is very similar, this process is very straight forward: 
 
-During this evaluation step, we choose between two different result types: \mintinline{Scala}{Ok} or \mintinline{Scala}{Mismatch}.
-These results are determined by comparing the \mintinline{Scala}{State} of some Identity with the corresponding Identity returned by HAGRID. For this purpose we can define the following function \(d(s_i,h_i)\)): 
+First we introduce a custom result type that encapsulates the two possible outcomes of comparing $(\text{Identity},\text{Status})$ tuples with a given identity. If the comparison shows that both identities have equal visibility states, we return an instance of the \mintinline{Scala}{Ok} type. Otherwise, we return a \mintinline{Scala}{Mismatch} instance, which contains further information regarding the specific \emph{kind} of mismatch we encountered. 
+
+ For this purpose we can define the following function \(d(s_i,h_i)\)): 
 \[
     d(s,h) = \begin{cases}
         \text{Ok} & \text{if } s = \epsilon \wedge h = \epsilon \\
