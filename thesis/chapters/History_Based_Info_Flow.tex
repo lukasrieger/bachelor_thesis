@@ -34,7 +34,7 @@ We can then define a state machine \(S\) which is a quintuple \((\Sigma,Q,s_0,\d
 \begin{itemize}
     \item \(\Sigma\) is the input alphabet given by the set \(\{\text{Upload},\text{Verify},\text{Revoke}\}\), corresponding to our history event types;
     \item \(Q\) is the finite set of states \(\{\Theta,U,C,R\}\);
-    \item \(s_0\) is the initial state of any identity, denoted as \(\Theta\);
+    \item \(s_0\) is the initial state of any identity, denoted as \(S_0\);
     \item \(\delta\) is the state transition function, defined by the following state transitions:
     \begin{equation}
         \begin{aligned}
@@ -48,41 +48,45 @@ We can then define a state machine \(S\) which is a quintuple \((\Sigma,Q,s_0,\d
 \end{itemize}
 
 The states of this state machine represent the privacy state after each transition, where a transition to \(U\) means, that the given identity has been uploaded, yet remains undiscoverable until further state changes. The \(C\) state occurs, when the given identity gets verified and therefore publicly available, whereas the \(R\) state describes the exact opposite, the given identity is private must first be re-verified to become available again.
-
-\begin{figure}[H]
-    \centering
-    \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2.8cm,semithick]
-    
-        \node[initial, state] (A)   {$\Theta$};
-        \node[state]          (B) [above right of=A]   {$U$};
-        \node[state]          (C) [below right of=B]   {$C$};
-        \node[state]          (D) [below right of=A]   {$R$};
-    
-        \path   (A)     edge               node {Upload}          (B)
-                        edge [loop below]  node {Revoke,Verify}   (A)
-                (B)     edge               node {Verify}          (C)
-                        edge [loop right]  node {Revoke,Upload}   (B)
-                (C)     edge [loop right]  node {Verify,Upload}   (C)
-                        edge [bend left]   node {Revoke}          (D)
-                (D)     edge [loop below]  node {Revoke,Upload}   (D)
-                        edge [bend left]   node {Verify}          (C);
-    
-    \end{tikzpicture}
-    \caption{Visualization of the single key/identity state machine}
-\end{figure}
-
-
-
+\\
 
 We can now generalize this state machine to support histories containing arbitrary amounts of keys and identities. Let's consider the set of state machines \(\{S_{i,k}\}\), where all state machines share their set of states and initial state with \(S\). 
 
 Given some event \(E_{i,k}\) and some state \(s \in Q\), we define \( \exists {s'} \subseteq \delta_{i',k'}(E_{i',k'},s) \) if, and only if \( \exists S_{i',k'} .\, i' = i \wedge k' = k\).
 Finally, it is easy to see, that any event \(E(t,f)\), where \(t\) is a set of identities can also be denoted as the set \(E' = \{E_{t_i,f} | t_i \in t\} \). That means, that any event that affects multiple identities at once can be equivalently formulated as a sequence of the same event that each affects a single event from the original set.
 
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2.8cm,semithick]
+    
+        \node[initial, state] (A)   {$S_0$};
+        \node[state]          (B) [above right of=A]   {$U$};
+        \node[state]          (C) [below right of=B]   {$C$};
+        \node[state]          (D) [below right of=A]   {$R$};
+        \node[state]          (E) [below right of=C]   {$E$};
+    
+        \path   (A)     edge               node {$\text{Upload}_{i,k}$}          (B)
+                        edge [loop below]  node {$\text{Revoke}_{i,k},\text{Verify}_{i,k}$}   (A)
+                (B)     edge               node {$\text{Verify}_{i,k}$}          (C)
+                        edge [loop right]  node {$\text{Revoke}_{i,k},\text{Upload}_{i,k}$}   (B)
+                (C)     edge [loop right]  node {$\text{Verify}_{i,k},\text{Upload}_{i,k}$}   (C)
+                        edge [bend left]   node {$\text{Revoke}_{i,k}$}          (D)
+                (D)     edge [loop below]  node {$\text{Revoke}_{i,k},\text{Upload}_{i,k}$}   (D)
+                        edge [bend left]   node {$\text{Verify}_{i,k}$}          (C);
+    
+    \end{tikzpicture}
+    \caption{Visualization of a state machine over a history}
+\end{figure}
 
+In order to emphasise which states support a successful key request, we added an additional state \(E\), which is only reachable by transitions labeled with \(\text{Get}_{i,k}\). We can think of \(E\) as a kind of implicit error state, which tells us, that the system encountered an attempt to retrieve a key \(k\), while the state machine associated with \(k\) was still in a state, that made returning a key impossible. 
 
-\textbf{TODO: Write down all state transitions.}
+It is easy to see, that this can only happen, if the state machine is either in its initial state \(S_0\), or all state machines \(t_{k,i}\) for a given \(k\) are currently in the state \(U\).
+\\
+\paragraph{Reformulating the example runs from chapter \ref{ref:Declass_and_Inter} using state machines}
+Looking at our previous history examples from chapter \ref{ref:Declass_and_Inter} we can see quite clearly, that our encoding of histories in terms of state machines gives us a surprisingly natural representation of our privacy states at every intermediate step of our history.
+Let \(h_1=\{Upload(k1),Get(id1),Upload(k2)\}\) and \(h_2 = \{Upload(k1),Get(id1),Upload(k2),Verify(id1),Get(id1)\}\).
 
+We can now visualize the both history runs accordingly, by showing the respective state transitions of their state machines at each step:
 
 The first step of evaluating a history requires us to divide the data contained in the history into three distinct maps \(U,C\) and \(R\), where \(U\) holds an entry for every uploaded key mapping the fingerprint to the key itself. \(C\) then maps each identity which remains \emph{confirmed} at the end of the history to the fingerprint of its parent key. \(R\) on the other hand, maps all identities which remain revoked to its parent key.
 
@@ -111,6 +115,9 @@ Ultimately, we want to obtain a map, that associates the fingerprint of every up
 
 \paragraph{History evaluation against a server model}
 Determining which associations between identities and keys are valid based on a history alone is only the first step of actually \emph{testing} HAGRID. To complete our history based approach, we require a way of comparing the results of the symbolic history execution to the actual server state. Only then can we determine, whether the model adheres to our chosen privacy constraints.
+
+
+
 The solution to this requirement consists of two parts in total. As a first step, we need to \emph{execute} the history on a given server backend. In a second step, we can then collect all available data from the server and compare the results to our previously computed visibilities. 
 \\ \\
 In order to visualize the execution of a history, we can look at the following example: 
