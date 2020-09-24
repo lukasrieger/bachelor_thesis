@@ -1,8 +1,5 @@
 
 \section{Practical implementation in Scala}
-\subsection{Tools and technology used}
-\newpage
-\subsubsection{Property based testing with ScalaCheck}
 \newpage
 \subsection{The abstract server model}
 In order to test the previously illustrated privacy constraints of PGP keys, we require a model of a PGP server which is sufficiently abstract to hide irrelevant implementation details, yet still exposes all functional specifications of the HAGRID server.
@@ -199,3 +196,80 @@ Depending on the currently folded over value, one or several of the maps will be
 \todo{Maybe illustrate this with a diagram? Visualize the maps and how a event can change one or more of them. }
 
 \newpage
+
+\subsection{Generating arbitrary histories with ScalaCheck}
+In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of HAGRID.
+
+\subsubsection{Generating test data with ScalaCheck generators}
+We achieved this by utilizing a property based testing approach, in which all our test cases depend on a \emph{generator} of arbitrary histories. The basic functionality for generators is provided by ScalaCheck, which exposes an abstract type \mintinline{Scala}{Gen[T]} for some type \mintinline{Scala}{T}. This type can subsequently be used as a potentially infinite source of test data, over which we can then express some universally quantified property that this data should possess.
+For example, the following code encodes the property that the act of taking the square root of any integer times itself should result in the original integer value: 
+\begin{minted}{Scala}
+    val propSqrt = forAll { (n: Int) => 
+        scala.math.sqrt(n*n) == n 
+    }
+\end{minted}
+
+We can now check that this property actually holds true by calling \mintinline{Scala}{propSqrt.check}. 
+ScalaCheck will now automatically check, whether this property holds true for some sufficiently large amount of integer values, which are provided by a built in integer generator. The result of executing the property check will confirm to us, what we already know -- namely that this property is obviously not true for any negative integer value: 
+\begin{minted}{Scala}
+scala> propSqrt.check
+! Falsified after 2 passed tests.
+> ARG_0: -1
+> ARG_0_ORIGINAL: -488187735
+\end{minted} 
+What this output tells us, is that the first value found to falsify our property was \(n=-488187735\). ScalaCheck was then able to \emph{shrink} this failing instance down to the much simpler case of \(n=-1\).
+
+\subsubsection{Implementing a generator for histories}
+In order to ensure that all events within a single history refer to a consistent set of common PGP keys and identities, we first generate a context object that carries all relevant information: 
+
+\begin{minted}{Scala}
+    class Context(val keys: Map[Fingerprint, Key])
+
+    def contextGen(keySize: Int, idsPerKey: Int)
+                  (implicit keyGen: Int => Gen[Key]): Gen[Context] = 
+        for {
+            keys <- Gen.listOfN(keySize,keyGen(keySize))
+            keyMap = (keys map (k => (k.fingerprint, k))).toMap
+        } yield new Context(keyMap)
+\end{minted}
+
+In a second step, our generator produces a random sequence of events, in which all necessary key data is provided by the current context.
+
+\begin{minted}{Scala}
+    def uploadEventGen(implicit context: Context): Gen[Event] =
+        for ((_, key) <- Gen.oneOf(context.keys)) yield Event.Upload(key)
+
+
+    def verifyEventGen(implicit context: Context): Gen[Event] =
+        for {
+            (fingerprint, key) <- Gen.oneOf(context.keys)
+            identities <- Gen.someOf(key.identities)
+        } yield Event.Verify(identities.toSet, fingerprint)
+
+
+    def revokeEventGen(implicit context: Context): Gen[Event] =
+        for {
+            (fingerprint, key) <- Gen.oneOf(context.keys)
+            identities <- Gen.someOf(key.identities)
+        } yield Event.Revoke(identities.toSet, fingerprint)
+\end{minted}
+
+Finally, we combine these separate event generators into a single generator that supports all three kinds of event types
+
+\begin{minted}{Scala}
+    def eventGen(implicit context: Context): Gen[Event] =
+        Gen.oneOf(uploadEventGen, verifyEventGen, revokeEventGen)
+\end{minted}
+
+The complete history generator then simply combines both context and event generators and wraps the generated sequences in a \mintinline{Scala}{History} object.
+
+\begin{minted}{Scala}
+    def historyGen(length: Int)
+                  (implicit keyGen: Int => Gen[Key]): Gen[History] =
+        for {
+            context <- contextGen(2, 2)(keyGen)
+            events <- Gen.listOfN(length, eventGen(context))
+        } yield History(events.toBuffer)
+\end{minted}
+
+\textbf{TODO: Explain role of keyGen: Int => Gen[Key]}

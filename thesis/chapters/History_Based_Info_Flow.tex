@@ -59,11 +59,11 @@ Finally, it is easy to see, that any event \(E(t,f)\), where \(t\) is a set of i
     \centering
     \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=2.8cm,semithick]
     
-        \node[initial, state] (A)   {$S_0$};
+        \node[initial, state] (A)                      {$S_0$};
         \node[state]          (B) [above right of=A]   {$U$};
         \node[state]          (C) [below right of=B]   {$C$};
         \node[state]          (D) [below right of=A]   {$R$};
-        \node[state]          (E) [below right of=C]   {$E$};
+        \node[state]          (E) [above of=A]         {$E$};
     
         \path   (A)     edge               node {$\text{Upload}_{i,k}$}          (B)
                         edge [loop below]  node {$\text{Revoke}_{i,k},\text{Verify}_{i,k}$}   (A)
@@ -86,8 +86,70 @@ It is easy to see, that this can only happen, if the state machine is either in 
 Looking at our previous history examples from chapter \ref{ref:Declass_and_Inter} we can see quite clearly, that our encoding of histories in terms of state machines gives us a surprisingly natural representation of our privacy states at every intermediate step of our history.
 Let \(h_1=\{Upload(k1),Get(id1),Upload(k2)\}\) and \(h_2 = \{Upload(k1),Get(id1),Upload(k2),Verify(id1),Get(id1)\}\).
 
-We can now visualize the both history runs accordingly, by showing the respective state transitions of their state machines at each step:
+We can now visualize both history runs accordingly, by showing the respective state transitions of their state machines at each step:
 
+\begin{figure}[H]
+    \begin{minipage}[t]{0.5\textwidth}
+        \centering
+        \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=1.6cm,semithick]
+            \node[initial, state]   (A)                         {$S_0$};
+            \node[state]            (B) [below of=A]            {$U$};
+            \node[state]            (E) [below of=B]            {$E$};
+            
+            \path   (A) edge    node    {$\text{Upload}_{id1,k1}$}  (B)
+                    (B) edge    node    {$\text{Get}_{id1,k1}$}     (E);
+        \end{tikzpicture}
+        \caption*{State flow of \{\mintinline{Text}{Upload(k1),Get(id1)}\}}
+    \end{minipage}
+    \begin{minipage}[t]{0.5\textwidth}
+        \centering
+        \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=1.6cm,semithick]
+            \node[initial, state]   (A)                         {$S_0$};
+            \node[state]            (B) [below of=A]            {$U$};
+
+            \path   (A) edge    node    {$\text{Upload}_{id2,k2}$}  (B);
+        \end{tikzpicture}
+        \caption*{State flow of \{\mintinline{Text}{Upload(k2)}\}}
+    \end{minipage}
+    \caption{State flow of $h_{1}$ split up into two separate state machines }
+\end{figure}
+From this we can easily determine, that our set of publicly accessible information is empty for our history $h_1$. Looking at the following state transition graphs for $h_2$ we can also see quite clearly how adding an instruction like \mintinline{Text}{Verify(id1)} changes that:
+\begin{figure}[H]
+    \begin{minipage}[t]{0.5\textwidth}
+        \centering
+        \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=1.6cm,semithick]
+            \node[initial, state]   (A)                         {$S_0$};
+            \node[state]            (B) [below of=A]            {$U$};
+            \node[state]            (C) [below of=E]            {$C$};
+            \node[state]            (E) [below of=B]            {$E$};
+            \node[state]            (V) [below of=C]            {$\epsilon$};
+            
+            \path   (A) edge    node    {$\text{Upload}_{id1,k1}$}  (B)
+                    (B) edge    node    {$\text{Get}_{id1,k1}$}     (E)
+                    (E) edge    node    {$\text{Verify}_{id1,k1}$}  (C)
+                    (C) edge    node    {$\text{Get}_{id1,k1}$}     (V);
+        \end{tikzpicture}
+        \caption*{State flow of \{\mintinline{Text}{Upload(k1),Get(id1),} \mintinline{Text}{Verify(id1),Get(id1)}\}}
+    \end{minipage}
+    \begin{minipage}[t]{0.5\textwidth}
+        \centering
+        \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=1.6cm,semithick]
+            \node[initial, state]   (A)                         {$S_0$};
+            \node[state]            (B) [below of=A]            {$U$};
+
+            \path   (A) edge    node    {$\text{Upload}_{id2,k2}$}  (B);
+        \end{tikzpicture}
+        \caption*{State flow of \{\mintinline{Text}{Upload(k2)}\}}
+    \end{minipage}
+    \caption{State flow of $h_{2}$ split up into two separate state machines }
+\end{figure}
+
+As \(h_2\) contains a sound \{\mintinline{Text}{Upload(...),Verify(...)}\} sequence, the state machine associated with \(k_1\) and \(id_1\) ends in a state, that we have defined as belonging to a valid \emph{public} state. 
+We can thus easily determine \emph{all} relevant privacy states by simply collecting the final state of each state machine.
+
+Note that this encoding \emph{only} works, because we can construct these state machines in a strictly separated manner. That means, that any event \(E_{i,k}\) will only ever affect a single state machine and will not introduce any side effects involving several state machines.
+
+\textbf{TODO: Is this relevant?} \\
 The first step of evaluating a history requires us to divide the data contained in the history into three distinct maps \(U,C\) and \(R\), where \(U\) holds an entry for every uploaded key mapping the fingerprint to the key itself. \(C\) then maps each identity which remains \emph{confirmed} at the end of the history to the fingerprint of its parent key. \(R\) on the other hand, maps all identities which remain revoked to its parent key.
 
 Formally, these three sets can now be defined as: 
@@ -140,6 +202,18 @@ The algorithm for testing HAGRID can then be summarized as:
 \end{enumerate}
 
 \paragraph{Determining invalid associations}
+Given that we now have an abstract model to evaluate the valid associations of keys and identities based on a history of events, we can now determine whether some HAGRID backend adheres to its privacy model. This is done by computing the \emph{difference} between the states that were determined to be visible by our history run and those returned by the backend.
+
+For this purpose, we can abstract over the states of our state machines that directly expresses, whether the identity associated with this state machine is \mintinline{Text}{Public}, \mintinline{Text}{Private} or \mintinline{Text}{Revoked}. The mapping from states to \mintinline{Text}{Public} is very straightforward, as it only consists of \{\(C\)\}. The same holds true for \mintinline{Text}{Revoked}, which is represented only by the \{\(R\)\} state. Finally, \mintinline{Text}{Private} then encompasses the remaining to states \{\(U,S_0\)\}.
+
+It should be noted that including a specific case for revoked identities would not be strictly necessary, as HAGRIDs returns an empty response both in the instance of \mintinline{Text}{Private} and \mintinline{Text}{Revoked} identities, rendering a distinction between these two states impossible from the outside. For the sake of accuracy, we still chose to include a \mintinline{Text}{Revoked} category, because it can convey useful information in the hypothetical scenario where HAGRID actually \emph{does} return a non-empty response and we want to include the exact kind of mismatch in an error message.
+
+\paragraph{Testing both functional correctness and privacy constraints at the same time}
+During a presentation of our preliminary progress on the VerifThis2020 challenge earlier this year in April, a member of one of the participating teams raised the question how our approach handles a theoretically maximally secure HAGRID server, that never returns any key data of any kind. Such a system would achieve the highest possible protection of PGP keys because its behaviour would prevent it from ever leaking any information, private or otherwise. On the other hand, this behaviour would simultaneously render the server completely useless at its intended usage as a public PGP key server.
+
+Given our formal approach of verifying privacy constrains as outlined in chapter \ref{sec:history_def}, we are able to strictly enforce the privacy of \emph{unverified} identities, while simultaneously ensuring that the server returns valid data in all other cases, where the release of declassified information is actually permissible. 
+
+
 Focusing on the last step, all that is left now is to compute all differing entries. Given that the format of both structures is very similar, this process is very straight forward: 
 
 First we introduce a custom result type that encapsulates the two possible outcomes of comparing $(\text{Identity},\text{Status})$ tuples with a given identity. If the comparison shows that both identities have equal visibility states, we return an instance of the \mintinline{Scala}{Ok} type. Otherwise, we return a \mintinline{Scala}{Mismatch} instance, which contains further information regarding the specific \emph{kind} of mismatch we encountered. 
