@@ -1,8 +1,8 @@
 \section{History based security specifications}
 Our approach must specifically be able to encode and evaluate \emph{dynamically} changing privacy constraints on a certain subset of relevant information. Additionally, these pieces of information are also dynamic and constantly changing while our system under test is actively operating. This poses several challenges in regards to how we can specify these constraints over the whole body of information beforehand. 
-Instead we have decided to utilise a \emph{history} based encoding scheme, that takes the sequential nature of privacy changes over several time steps into account.
+Instead, we have decided to utilise a \emph{history} based encoding scheme, that takes the sequential nature of privacy changes over several time steps into account.
 \subsection{What constitutes a history}
-We rely on a central data structure, a sequential \emph{history} of abstract events, that each encode a high level operation depending on the system under test.
+We rely on a central data structure, a sequential \emph{history} of abstract events, that each encodes a high-level operation depending on the system under test.
 Formally, we can thus define any history \(h\) as
 \[
     h_n = \{ev_1,ev_2,\dots, ev_n\},
@@ -28,7 +28,7 @@ Specifically, our goal is to run a symbolic execution of a history, which ultima
 
 Evaluation of arbitrary histories can be formally approximated by a set of state machines \(S_i\). Each state machine tracks the visibility state of its associated identity \(i\).
 
-In order to show how this formalization works, let us first look at a simpler case, where we only consider histories of events that affect a single key with only one associated identity. 
+To show how this formalization works, let us first look at a simpler case where we only consider histories of events that affect a single key with only one associated identity. 
 
 We can then define a state machine \(S\) which is a quintuple \((\Sigma,Q,s_0,\delta,F)\), where:
 \begin{itemize}
@@ -78,7 +78,7 @@ Finally, it is easy to see, that any event \(E(t,f)\), where \(t\) is a set of i
     \caption{Visualization of a state machine over a history}
 \end{figure}
 
-In order to emphasise which states support a successful key request, we added an additional state \(E\), which is only reachable by transitions labeled with \(\text{Get}_{i,k}\). We can think of \(E\) as a kind of implicit error state, which tells us, that the system encountered an attempt to retrieve a key \(k\), while the state machine associated with \(k\) was still in a state, that made returning a key impossible. 
+In order to emphasise which states support a successful key request, we added an additional state \(E\), which is only reachable by transitions marked with \(\text{Get}_{i,k}\). We can think of \(E\) as a kind of implicit error state, which tells us, that the system encountered an attempt to retrieve a key \(k\), while the state machine associated with \(k\) was still in a state, that made returning a key impossible. 
 
 It is easy to see, that this can only happen, if the state machine is either in its initial state \(S_0\), or all state machines \(t_{k,i}\) for a given \(k\) are currently in the state \(U\).
 \\
@@ -113,7 +113,7 @@ We can now visualize both history runs accordingly, by showing the respective st
     \end{minipage}
     \caption{State flow of $h_{1}$ split up into two separate state machines }
 \end{figure}
-From this we can easily determine, that our set of publicly accessible information is empty for our history $h_1$. Looking at the following state transition graphs for $h_2$ we can also see quite clearly how adding an instruction like \mintinline{Text}{Verify(id1)} changes that:
+From this, we can easily determine that our set of publicly accessible information is empty for history $h_1$. Looking at the following state transition graphs for $h_2$ we can also see quite clearly how adding an instruction like \mintinline{Text}{Verify(id1)} changes that:
 \begin{figure}[H]
     \begin{minipage}[t]{0.5\textwidth}
         \centering
@@ -152,20 +152,19 @@ Note that this encoding \emph{only} works, because we can construct these state 
 \textbf{TODO: Is this relevant?} \\
 The first step of evaluating a history requires us to divide the data contained in the history into three distinct maps \(U,C\) and \(R\), where \(U\) holds an entry for every uploaded key mapping the fingerprint to the key itself. \(C\) then maps each identity which remains \emph{confirmed} at the end of the history to the fingerprint of its parent key. \(R\) on the other hand, maps all identities which remain revoked to its parent key.
 
-Formally, these three sets can now be defined as: 
+Formally, the set of all uploaded keys can be constructed from a given history as follows:
+\newcommand{\pctext}[2]{\text{\parbox{#1}{\centering #2}}}
+\[U = \biggl \{k \;\bigg|\; \text{Upload}_{i,k} \in H \biggr\}\]
+having \(\text{Upload}_{i,k} \in H \Leftrightarrow \exists x. H_x = \text{Upload}_{i,k}\). 
+From this set we can then define the total set of all revoked and verified \mintinline{Text}{(Identity,Key)} pairs:
 
 \begin{equation}
-    \begin{aligned}
-        U =& \{(k.fingerprint,k)  \mid k \in H(\text{Upload}) \} \\
-        C =& \{(i, fingerprint_i) \mid i \in H(\text{Verify}) \wedge \phi(i, H_n) \} \\
-        R =& \{(i, fingerprint_i) \mid i \in H(\text{Revoke}) \wedge \neg \phi(i,H_n)\}
-    \end{aligned}
+    \begin{alignedat}{2}
+        C &= \biggl \{(i,k) &&\;\bigg|\; \pctext{2.4in}{\(\exists t,t'. H_t = \text{Upload}_{i,k},H_{t'} = \text{Verify}_{i,k}, t < t', \forall z > t'. H_z \neq \text{Revoke}_{i,k}\)}  \biggr \} \\[10pt]
+        R &= \biggl \{(i,k) &&\;\bigg|\; \pctext{2.4in}{\(\exists t,t'. H_t = \text{Upload}_{i,k},H_{t'} = \text{Revoke}_{i,k}, t < t', \forall z > t'. H_z \neq \text{Verify}_{i,k}\)}  \biggr \}
+    \end{alignedat}
 \end{equation}
-   where \(\phi\) is defined as 
-\begin{equation}
-    \phi(i,H_n) = \exists e_t\in H(\text{Verify}) ( i \in e.ids \wedge (\forall e_k \in H(\text{Revoke}) k < i  ))
-\end{equation}
- 
+
 Ultimately, we want to obtain a map, that associates the fingerprint of every uploaded key to a set of \mintinline{scala}{(Identity,Status)} tuples. In this case, \mintinline{scala}{Status} indicates the visibility of the associated identity, which may take either of the following three values: 
 \begin{itemize}
     \item \emph{Public} -- The identity has been declassified and can be made publicly available.
@@ -176,7 +175,7 @@ Ultimately, we want to obtain a map, that associates the fingerprint of every up
 \textbf{TODO: formalize withUploaded, etc. }
 
 \paragraph{History evaluation against a server model}
-Determining which associations between identities and keys are valid based on a history alone is only the first step of actually \emph{testing} HAGRID. To complete our history based approach, we require a way of comparing the results of the symbolic history execution to the actual server state. Only then can we determine, whether the model adheres to our chosen privacy constraints.
+Determining which associations between identities and keys are valid based on a history alone is only the first step of actually \emph{testing} HAGRID. To complete our history-based approach, we require a way of comparing the results of the symbolic history execution to the actual server state. Only then can we determine, whether the model adheres to our chosen privacy constraints.
 
 
 
@@ -206,17 +205,19 @@ Given that we now have an abstract model to evaluate the valid associations of k
 
 For this purpose, we can abstract over the states of our state machines that directly expresses, whether the identity associated with this state machine is \mintinline{Text}{Public}, \mintinline{Text}{Private} or \mintinline{Text}{Revoked}. The mapping from states to \mintinline{Text}{Public} is very straightforward, as it only consists of \{\(C\)\}. The same holds true for \mintinline{Text}{Revoked}, which is represented only by the \{\(R\)\} state. Finally, \mintinline{Text}{Private} then encompasses the remaining to states \{\(U,S_0\)\}.
 
-It should be noted that including a specific case for revoked identities would not be strictly necessary, as HAGRIDs returns an empty response both in the instance of \mintinline{Text}{Private} and \mintinline{Text}{Revoked} identities, rendering a distinction between these two states impossible from the outside. For the sake of accuracy, we still chose to include a \mintinline{Text}{Revoked} category, because it can convey useful information in the hypothetical scenario where HAGRID actually \emph{does} return a non-empty response and we want to include the exact kind of mismatch in an error message.
+It should be noted that including a specific case for revoked identities would not be strictly necessary, as HAGRIDs returns an empty response both in the instance of \mintinline{Text}{Private} and \mintinline{Text}{Revoked} identities, rendering a distinction between these two states impossible from the outside. For the sake of accuracy, we still chose to include a \mintinline{Text}{Revoked} category, because it can convey useful information in the hypothetical scenario where HAGRID \emph{does} return a non-empty response and we want to include the exact kind of mismatch in an error message.
 
 \paragraph{Testing both functional correctness and privacy constraints at the same time}
-During a presentation of our preliminary progress on the VerifThis2020 challenge earlier this year in April, a member of one of the participating teams raised the question how our approach handles a theoretically maximally secure HAGRID server, that never returns any key data of any kind. Such a system would achieve the highest possible protection of PGP keys because its behaviour would prevent it from ever leaking any information, private or otherwise. On the other hand, this behaviour would simultaneously render the server completely useless at its intended usage as a public PGP key server.
+During a presentation of our preliminary progress on the VerifThis2020 challenge earlier this year in April, a member of one of the participating teams raised the question of how our approach handles a theoretically maximally secure HAGRID server, that never returns any key data of any kind. Such a system would achieve the highest possible protection of PGP keys because its behaviour would prevent it from ever leaking any information, private or otherwise. On the other hand, this behaviour would simultaneously render the server completely useless at its intended usage as a public PGP key server.
 
-Given our formal approach of verifying privacy constrains as outlined in chapter \ref{sec:history_def}, we are able to strictly enforce the privacy of \emph{unverified} identities, while simultaneously ensuring that the server returns valid data in all other cases, where the release of declassified information is actually permissible. 
+
+
+Given our formal approach of verifying privacy constraints as outlined in chapter \ref{sec:history_def}, we can strictly enforce the privacy of \emph{unverified} identities, while simultaneously ensuring that the server returns valid data in all other cases, where the release of declassified information is actually permissible. 
 
 
 Focusing on the last step, all that is left now is to compute all differing entries. Given that the format of both structures is very similar, this process is very straight forward: 
 
-First we introduce a custom result type that encapsulates the two possible outcomes of comparing $(\text{Identity},\text{Status})$ tuples with a given identity. If the comparison shows that both identities have equal visibility states, we return an instance of the \mintinline{Scala}{Ok} type. Otherwise, we return a \mintinline{Scala}{Mismatch} instance, which contains further information regarding the specific \emph{kind} of mismatch we encountered. 
+First, we introduce a custom result type that encapsulates the two possible outcomes of comparing $(\text{Identity},\text{Status})$ tuples with a given identity. If the comparison shows that both identities have equal visibility states, we return an instance of the \mintinline{Scala}{Ok} type. Otherwise, we return a \mintinline{Scala}{Mismatch} instance, which contains further information regarding the specific \emph{kind} of mismatch we encountered. 
 
  For this purpose we can define the following function \(d(s_i,h_i)\)): 
 \[
