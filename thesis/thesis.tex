@@ -1,5 +1,6 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
+\usepackage[newfloat]{minted}
 \usepackage{graphicx}
 \usepackage[pages=some]{background}
 \usepackage[nottoc]{tocbibind}
@@ -10,7 +11,6 @@
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{amsmath}
-\usepackage{minted}
 \usepackage{todonotes}
 \usepackage{multicol}
 \usepackage[compatibility=false]{caption}
@@ -19,6 +19,8 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows,automata}
 \usepackage{pgf}
+
+
 
 
 
@@ -45,6 +47,12 @@
 \clubpenalty10000
 
 \begin{document}
+
+\newenvironment{code}{\captionsetup{type=listing}}{}
+\SetupFloatingEnvironment{listing}{name=Source Code}
+
+\addtolength{\belowcaptionskip}{5pt}
+\addtolength{\abovecaptionskip}{-5pt}
 
 \input{config}
 
@@ -75,7 +83,7 @@
 	\large \begin{tabular}{ l l }
 	  \textsc{Bearbeiter}:&{\thesisauthor}
 	  \\
-	  \textsc{Betreuer:}&{\supervisor}\\
+	  \textsc{Supervisor:}&{\supervisor}\\
 	  \\
 	\end{tabular}
 	\par

@@ -34,7 +34,7 @@ To explain this concept in terms of our problem domain of PGP servers, let us as
     \)
 
 Based on this, we can image the following, highly simplified interaction between the two users and HAGRID
-\begin{figure}[H]
+\begin{figure}[h]
     \label{fig:example}
     \centering
     \includegraphics{images/non_interference.pdf}
@@ -44,7 +44,7 @@ Based on this, we can image the following, highly simplified interaction between
 The second call of \(u2\) in this sequence is a key request for identity \(id1\) which belongs to the previously uploaded key \(k1\). Yet, because the identity had not been verified when \(u2\) issued its key request, the resulting response will be empty. That means, that the actions of \(u1\) hat no effect \emph{at all} on the experience of \(u2\). 
 As a matter of fact, based on the interactions with HAGRID alone, \(u2\) has no way of identifying whether there even \emph{is} another user currently interacting with the same system. 
 In contrast to that, let us assume that this sequence of interactions is continued in the following way: 
-\begin{figure}[H]
+\begin{figure}[h]
     \label{fig:example}
     \centering
     \includegraphics{images/interfering.pdf}
@@ -53,10 +53,17 @@ In contrast to that, let us assume that this sequence of interactions is continu
 
 The second \(get\) request now yields a different response as before. Instead of an empty response, \(u2\) now receives a key with an identity. This change in behaviour was caused by \(u1\) issuing a verification for \(id1\). Therefore, the actions of \(u1\) were able to influence the sequence of interactions between \(u2\) and HAGRID, which causes this interaction to no longer be \emph{non-interfering}.
 \\ \\
+
+\paragraph{Definition of non-interference by \citeauthor{Goguen_Meseguer_82}}
 A more formal definition of non-interference is given by \citeauthor{Goguen_Meseguer_82} in \citetitle{Goguen_Meseguer_82}, which is also the paper that initially popularized the notion of non-interference. 
 In order to give a brief summary of their definition of non-interference, let us first introduce the central terms on which their definition relies. From here on, let \(Q\) denote some abstract system, which can be approximately modeled as some state machine \(M = \{U,S,C,\text{Out}\}\). 
 In this context, let \(U\) be a set whose elements denote the users of \(Q\). Additionally, let \(S\) be the set of abstract states of \(M\), while \(C\) denotes the set of ``commands'' that may cause a state transition in \(M\). Finally, let \(\text{Out}\) refer to the set of all ``outputs'' that \(Q\) may generate. 
-Given these foundational definitions, \citeauthor{Goguen_Meseguer_82} proceed to define three kinds of non-interference: 
+Given these foundational definitions, \citeauthor{Goguen_Meseguer_82} proceed to define a function \(p\): 
+
+Given a subset \(G\) of all users \(U\) and some subset \(A\) of state altering commands \(C\), let \(w\) be in \((U \times C)^*\). That is, \(w\) is an ordered sequence of pairs consisting of a user and an associated command. 
+
+Finally, let \(p_G(w)\) be equal to \(w\) excluding any pairs \((u,c)\), where \(u \in G\). Similarly, let \(p_A(w)\) be equal to \(w\) excluding any pairs \((u,c)\) where \(c \in A\). In combination, let \(p_{G,A}\) be equal to \(w\) excluding any pairs \((u,c)\) where \(u \in G\) and \(c \in A\).
+From there, \citeauthor{Goguen_Meseguer_82} then directly derive three notions of non-interference:
 \begin{enumerate}
     \item Non-interference between two sets of users: Given a state machine \(M\) and two sets of users \(G\) and \(G'\), we let \(G :\mid G'\) denote that \(G\) and \(G'\) are non-interfering, iff \[ 
         [[\;w\;]]_u = [[\;p_G(w)\;]]_u  
@@ -72,7 +79,7 @@ Given these foundational definitions, \citeauthor{Goguen_Meseguer_82} proceed to
     That is, they are only non-interfering if the outputs caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding all elements involving a user from \(G\) and ability from \(A\).
 \end{enumerate}
 
-\textbf{TODO: Missing explanations for \(p_a \) etc!!! Also, what are abilities ?!}
+
 
 Note that all of the definitions above describe purely \emph{static} non-interference policies. That is, the non-interference policy must always hold and thus never allows any sets of users and abilities to interfere \emph{at all}. 
 
@@ -91,8 +98,8 @@ That is, given some key K, we guarantee that a user \(u\) does not interfere wit
 In return, that also means that we explicitly permit interference by supporting declassification of formerly confidential information in such cases, where it is permissible for a user to affect the privacy state of some key \(K\).
 
 As \citeauthor{declass_dim_prin} explain in their paper \citetitle{declass_dim_prin}, the core issue therefore lies with ensuring that the release of information in these instances is actually \emph{safe}. That is, that such a system never accidentally declassifies more information than it ought to, as that would consequently also violate its non-interference policies.
-The main challenge that one faces when trying to \emph{verify} whether Hagrid adheres to these policies, is that the set of theoretically visible identities is constantly changing and therefore dynamic.
+The main challenge that one faces when trying to \emph{verify} whether Hagrid adheres to these policies, is that the set of theoretically visible identities is constantly changing and strongly depends on dynamic runtime values within the Hagrid system. 
+While there exist some approaches like the one laid out in \citetitle{Lourenco_Caires_15} by \citeauthor{Lourenco_Caires_15}, which are based on Dependent Type Theory and allow one to formulate Information Flow types that depend on runtime values, these approaches are relatively novel and unexplored.
 
-In the following chapter we present a possible approach that allows us to verify these dynamic privacy and declassification policies.
+In the following chapter, we instead present an approach to ensure the safe declassification of sensitive information during runtime that utilizes the notion of state machines similarly to \citeauthor{Goguen_Meseguer_82}. We then extend the approach in such a way, as to allow us to specify exactly what sensitive information is declassifiable (or potentially reclassifiable) by Hagrid based on the input of the system.
 
-\textbf{Todo: Is this enough? Should probably mention some of the new concepts introduced here in later chapters aswell...}
