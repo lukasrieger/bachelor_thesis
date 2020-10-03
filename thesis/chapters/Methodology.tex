@@ -163,7 +163,7 @@ The state of an identity may take any of these three forms:
 \begin{itemize}
     \item Public: The identity has been confirmed and therefore publicly visible
     \item Private: The identity has not been confirmed yet and therefore remains private
-    \item Revoked: The identity had been confirmed at some prior point in the history but has since been revoked.
+    \item Revoked: The identity had been confirmed at some prior point but has since been revoked.
 \end{itemize}
 In terms of visibility, a \mintinline{scala}{Private} identity and a \mintinline{scala}{Revoked} identity can be considered equal from the perspective of a user. In both cases, the identity should not be included in any key requests.
 
