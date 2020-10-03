@@ -167,15 +167,53 @@ The state of an identity may take any of these three forms:
 \end{itemize}
 In terms of visibility, a \mintinline{scala}{Private} identity and a \mintinline{scala}{Revoked} identity can be considered equal from the perspective of a user. In both cases, the identity should not be included in any key requests.
 
-In order to determine these states for every possible identity, we define a method \mintinline{scala}{def states: Map[Fingerprint, Set[(Identity, Status)]]} on \mintinline{scala}{History}.
+In order to determine these states for every possible identity, we define a new method \mintinline{scala}{def states: Map[Fingerprint, Set[(Identity, Status)]]} within \mintinline{scala}{History}.
 The method starts off with three separate maps \mintinline{scala}{Uploaded}, \mintinline{scala}{Confirmed} and \mintinline{scala}{Revoked}. These maps are then populated by folding over the sequence of events.
 Depending on the currently folded value, one or several of the maps will be updated. 
 
+\begin{code}
+    \begin{minted}{scala}
+    val withUploadedAndConfirmed = confirmed.foldLeft(withUploaded) { (acc, elem) =>
+        acc.get(elem._2) match {
+            case Some(states) =>
+                acc updated(elem._2, 
+                        states - (elem._1 -> Private) - (elem._1 -> Revoked) + (elem._1 -> Public)
+                        )
+            case _ => acc
+        }
+    }.toMap
+    \end{minted}
+    \caption{Adding confirmed identities to their associated key}
+\end{code}
+
 \paragraph{Executing a history on the server model}
+Given a history and the computed privacy state based on that history, we can now define a simple execution strategy that sequentially loops through the history and sends the corresponding data to the server.
+The signature of the execution algorithm is given by \mintinline{scala}{def execute(server: HagridInterface, history: History): Unit}.
+The algorithm then simply pattern matches the concrete event type and based on that type, calls the corresponding server method: 
+\begin{code}
+    \begin{minted}{scala}
+        val uploaded: mutable.Map[Fingerprint, Token] = mutable.Map()
+        for (event <- history.events) {
+          event match {
+            case Event.Upload(key) =>
+              uploaded += ((key.fingerprint, server upload key))
+            case Event.Revoke(identities, _) =>
+              for {
+                head <- identities
+                token <- server requestManage head map (_.token)
+              } server revoke(token, Set(head))
+            case Event.Verify(identities, fingerprint) =>
+              for {
+                uploadToken <- uploaded.get(fingerprint)
+                Body(_, token, _) <- server requestVerify(uploadToken, identities)
+              } server verify token
+          }
+        }
+    \end{minted}
+    \caption{Sequential execution of a history}
+\end{code}
 
-Given some history of arbitrary length, we can now define a simple execution strategy that sequentially runs the given history and sends the corresponding data to the server.
-The signature of the execution algorithm is given by \mintinline{scala}{def execute(server: HagridInterface, history: History): Unit}. The method then simply loops through 
-
+As already mentioned in \ref{sec:history_def}, the history itself is completely unaware of \emph{how} it will be interpreted. In fact, the history is specifically asbtracting over any concrete execution details like having to receive and respond to confirmation mails.
 
 \todo{This explanation is currently pretty bad and unfinished.}
 \todo{Maybe illustrate this with a diagram? Visualize the maps and how an event can change one or more of them. }
