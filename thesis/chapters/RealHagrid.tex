@@ -1,64 +1,67 @@
-\section{Testing the real-world implementation of HAGRID}
-Given that we had successfully developed a working testing framework for our abstract model, we decided to integrate the actual HAGRID server into our testing efforts.
-For obvious reasons, testing HAGRID requires a local server instance to be running on the same machine. 
+\section{Testing the real-world implementation of Hagrid}
+\label{sec:real_hagrid}
+Given that we have successfully developed a framework in which we can test our abstract model of Hagrid, we decided to integrate the official implementation of Hagrid into our testing efforts.
+Assuming that the maintainers of Hagrid would likely not appreciate it if their server received hundreds of spam-like calls to their server at \url{https://keys.openpgp.org/}, running our tests requires a separate instance of Hagrid to be running on the local machine.
 
-\paragraph{Communicating with HAGRID}
-The main effort of integrating HAGRID into our implementation focussed on the relaying and receiving of messages between our Scala frontend and HAGRID.
-To this end, we use \emph{Sttp}, which is a simple library that enables us to communicate with the server through REST-full http calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe} as a library.
+\paragraph{Communicating with Hagrid}
+The main effort of integrating Hagrid into our implementation focussed on the relaying and receiving of messages between our Scala frontend and Hagrid.
+To this end, we use \emph{Sttp}\footnote{https://sttp.softwaremill.com/en/latest/}, which is a simple library that enables us to communicate with the server through REST-full HTTP calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe}\footnote{https://circe.github.io/circe/} as a dependency.
 
-HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}, exposes the following endpoints: 
-\begin{itemize}
-    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-fingerprint/FINGERPRINT}
-    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-keyid/KEY-ID}
-    \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-email/URI-ENCODED EMAIL-ADDRESS}
-    \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/upload}
-    \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/request-verify}
-\end{itemize}
+HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}\footnote{https://keys.openpgp.org/about/api}, exposes the following endpoints: 
+\begin{figure}[h]
+    \begin{itemize}
+        \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-fingerprint/FINGERPRINT}
+        \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-keyid/KEY-ID}
+        \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-email/URI-ENCODED EMAIL-ADDRESS}
+        \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/upload}
+        \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/request-verify}
+    \end{itemize}
+    \caption{HTTP endpoints defined by Hagrid}
+\end{figure}
 
-The interface which actually communicates with the server exposes exactly the same methods as our model, due to it implementing the same 
-\mintinline{scala}{HagridInterface}.
+In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to Hagrid via HTTP.
 
-Instead of keeping track of keys and identities in the frontend, our \mintinline{scala}{HagridServer} simply relays all actions to HAGRID by http.
-As an example, lets look at the \mintinline{scala}{upload} method once again: 
+As an example, lets look at the \mintinline{scala}{upload} method: 
 \begin{minted}{scala}
-    override def upload(key: Key): Token = {
-        val response = basicRequest
-            .post(hag("/vks/v1/upload"))
-            .body(UploadBody(key.armored))
-            .response(asJson[UploadResponse])
-            .send()
-            .body
- 
-        Token(response
-        .toOption
-        .get
-        .token)
+override def upload(key: Key): Token = {
+    val response = basicRequest
+        .post(hag("/vks/v1/upload"))
+        .body(UploadBody(key.armored))
+        .response(asJson[UploadResponse])
+        .send()
+        .body
+
+    Token(response
+    .toOption
+    .get
+    .token)
   }
 \end{minted}
-First, we construct a simple \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
+First, we construct a \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
 The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token, which we require in order to send any verification requests at a later point.
 
-However, it must be noted that our implementation, while fully working, generally \emph{ignores} the possibility of an error occurring while communicating with HAGRID. We are aware that this may cause unforeseen problems in the future.
+Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with Hagrid. We are aware that his my cause unforeseen problems in some edge-cases, like the local Hagrid instance suddenly crashing.
 
 \subsection{Receiving verification mails from HAGRID}
-While we were able to simulate the transmission of verification mails in an abstract and direct way for our server model, we had no such option when dealing with the real-world HAGRID server. 
+While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world Hagrid server. 
 
-During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} command to be available in the environment in order to send and receive mails.
+During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
 Luckily, we discovered that HAGRID also provides an alternative mode of operation, in which all email transfer is handled directly through the filesystem.
-Modifying the configuration file \mintinline{text}{Rocket.toml} and adding the line \mintinline{text}{mail_folder=/PATH/TO/MAIL}, causes HAGRID to write all mails to a unique file in the specified folder.
+Hagrid uses a configuration file called \mintinline{text}{Rocket.toml}, which allows us to specify a folder to be used as the destination for all outgoing Hagrid emails.   
+Modifying the configuration file by adding the line \mintinline{text}{mail_folder=/PATH/TO/DESTINATION} therefore causes HAGRID to write all emails to a unique file in the specified folder.
 
 This allows us to simply observe the given directory and react to any file modifications within the folder.
-More specifically, we defined a method, that would block its execution until it successfully read all expected mails: 
-\label{code:consumeMail}
-\begin{minted}{scala}
-    private def consumeMail(expectedSize: Int): Seq[Body] = {
+More specifically, we define a method, that blocks its execution until it has successfully read the expected amount of emails: 
+\begin{code}
+    \begin{minted}{scala}
+    def consumeMail(expectedSize: Int): Seq[Body] = {
         val watchKey = mailWatcher.take
         val events = watchKey.pollEvents.asScala
         val updatePaths = events
             .take(expectedSize)
             .map(_.asInstanceOf[WatchEvent[Path]])
             .map(_.context())
-
+    
         val mails = updatePaths.flatMap { currentPath =>
             val resolved = mailPath.resolve(currentPath).toFile
             val source = Source.fromFile(resolved)
@@ -69,38 +72,44 @@ More specifically, we defined a method, that would block its execution until it 
             bodies
         }
         mails
-  }
-\end{minted}
+    }
+    \end{minted}
+    \caption{Reading Hagrid's emails by observing filesystem changes}
+\end{code}
+\label{code:consumeMail}
 where the returned sequence of mail bodies takes the form of:
 \begin{minted}{scala}
-    case class Body(fingerprint: Fingerprint, token: Token, identity: Identity)
+case class Body(
+    fingerprint: Fingerprint, 
+    token: Token, 
+    identity: Identity
+)
 \end{minted}
 
 \paragraph{Parsing plain text confirmation mails}
-In order to consume the emails within the selected directory and actually use the information contained within them, we had to parse the plain text content of said mails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and finally the respective \mintinline{scala}{Identity} in concern.
-
-For example, a typical mail issued by HAGRID (running as a local instance) in repsonse to a confirmation request might look like this: 
-\begin{minted}{text}
+To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by Hagrid in response to a confirmation request might look like this: 
+\begin{figure}[H]
+    \begin{minted}{text}
     To: <ISSUE_EMAIL@ADDRESS> 
     Hi,
-   
+    
     Dies ist eine automatische Nachricht von localhost.
     Falls dies unerwartet ist, bitte die Nachricht ignorieren.
-   
+
     OpenPGP Schlüssel: 23B2E0C54487F50AC59134C3A1EC9765D7B25C5A 
-   
-    Damit der Schlüssel über die Email-Adresse "<ISSUE_EMAIL@ADDRESS>" gefunden werden kann,
-    klicke den folgenden Link:
-   
+    Damit der Schlüssel über die Email-Adresse "<ISSUE_EMAIL@ADDRESS>" 
+    gefunden werden kann, klicke den folgenden Link:
+    
     http://localhost:8080/verify/vrTohvV8q552KMvARBE7foqkvGtUrfDl3iiyX9yqeOX 
-   
+    
     Weitere Informationen findest du unter http://localhost:8080/about
+    \end{minted}
+    \caption{Automatically generated verification email by Hagrid}
+\end{figure}
 
-\end{minted}
-\todo{This mail should be in english as well.}
-
-We currently use a regular expression to parse the relevant information from these mails. This functionality is summarized in a method \mintinline{scala}{parseMail}:
-\begin{minted}{scala}
+We use a regular expression to parse the relevant information from these mails. This functionality is summarized in a method \mintinline{scala}{parseMail}:
+\begin{code}
+    \begin{minted}{scala}
     val VERIFY_PATTERN: Regex = 
         "(?s).*To: <(\\S+)>.*OpenPGP key: ||
         (\\S+).*http://localhost:8080/verify/(\\S+).*<!doctype html>.*".r
@@ -110,26 +119,35 @@ We currently use a regular expression to parse the relevant information from the
             .map(mail => new String(mail.message))
             .map {
             case REVOKE_PATTERN(identity, fingerprint, token) => 
-                Body(FingerprintImpl(fingerprint), Token(token), PgpIdentity(identity))
+                Body(FingerprintImpl(fingerprint), 
+                        Token(token), 
+                        PgpIdentity(identity)
+                    )
             case VERIFY_PATTERN(identity, fingerprint, token) => 
-                Body(FingerprintImpl(fingerprint), Token(token), PgpIdentity(identity))
+                Body(FingerprintImpl(fingerprint), 
+                        Token(token), 
+                        PgpIdentity(identity)
+                    )
             }
             .toSeq
-\end{minted}
-As seen in the code sample in \ref{code:consumeMail}, this function is responsible for parsing the mails, that \mintinline{scala}{consumeMail} read from the dedicated mail directory.
+    \end{minted}
+    \caption{Parsing relevant information from Hagrid emails}
+\end{code}
+
+As seen in the code sample in chapter \ref{code:consumeMail}, this function is responsible for parsing the mails read by \mintinline{scala}{consumeMail} from the dedicated mail directory.
 
 \subsection{Generating valid PGP keys}
-While our testing efforts were mainly focussed on our own abstract model, we were able to use a simplified representation of our \mintinline{scala}{Key} datatype to represent a PGP key. 
+In the context of our abstract Hagrid model we were able to rely on a simplified implementation of our PGP \mintinline{scala}{Key} type: 
 \begin{minted}{scala}
-    sealed trait Key {
-        def armored: String
-        def keyId: KeyId
-        def fingerprint: Fingerprint
-        def identities: Set[Identity]
-        def restrictedTo(ids: Set[Identity]): Key
-    }
+sealed trait Key {
+    def armored: String
+    def keyId: KeyId
+    def fingerprint: Fingerprint
+    def identities: Set[Identity]
+    def restrictedTo(ids: Set[Identity]): Key
+}
 \end{minted} 
-For example, \mintinline{scala}{keyId} simply consists of a unique string identifier that does not hold any specific meaning:
+For example, we would represent \mintinline{scala}{KeyId} or \mintinline{scala}{Fingerprint} values as simple \mintinline{scala}{UUID} instances. This allowed us to work with values that were unlikely to collide with each other while keeping the implementation relatively simple:
 \begin{minted}{scala}
     sealed trait KeyId {
         def value: String
@@ -141,20 +159,19 @@ For example, \mintinline{scala}{keyId} simply consists of a unique string identi
         def random: KeyId = KeyIdImpl(UUID.randomUUID().toString)
     }
 \end{minted}
-In order to transmit any \mintinline{scala}{Key} values to the actual HAGRID server, we couldn't rely on the existing dummy implementation, as HAGRID would reject any PGP key that is not properly formatted.
 
-In order to solve this problem, we decided to implement a mechanism that is capable of generating valid PGP keys. 
-For this purpose, we use \emph{BouncyCastle}, which is a Java library for cryptographic use cases.
+When communicating with the actual Hagrid implementation, that solution is obviously insufficient because Hagrid verifies all incoming PGP keys for proper formatting and structure. To solve this problem, we decided to implement a mechanism capable of generating valid PGP keys. 
+For this purpose, we use \emph{BouncyCastle}\footnote{https://www.bouncycastle.org/}, which is a Java library for cryptographic use cases.
 
 The general signature to generate a PGP key is as following: 
 \begin{minted}{scala}
     def genPublicKey(identities: Set[Identity]): (PGPPublicKey, String)
 \end{minted}
 It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable.
-\newpage
+\paragraph{Running tests against a local Hagrid instance} Given that our test approach outlined in chapter \ref{sec:test_approach} is fully agnostic towards the underlying server implementation, adding support for Hagrid only required us to adhere to the API contract given by \mintinline{scala}{HagridInterface}.
 \subsection{Initializing}
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
-In contrast to this, our high level model of HAGRID maintains no state at all between any two separate test runs.
+In contrast to this, our high-level model of HAGRID maintains no state at all between any two separate test runs.
 
 This is problematic, because our testing approach fundamentally relies on a limited amount of \emph{Identities}, that are subsequently used to construct PGP Keys. This would necessarily lead to unexpected results when applying our approach to HAGRID, where there could potentially already be an identity associated to some PGP key, that was uploaded during a previous testing session. 
 To elaborate on this problem, let us assume these two separate test runs in pseudo-code:

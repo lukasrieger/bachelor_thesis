@@ -1,5 +1,6 @@
 
 \section{Practical implementation in Scala}
+\label{sec:abstract_model}
 \paragraph{The abstract server model}
 In order to test the previously illustrated privacy constraints of PGP keys, we require a model of a PGP server which is sufficiently abstract to hide irrelevant implementation details, yet still exposes all functional specifications of the HAGRID server.
 
@@ -32,11 +33,11 @@ This set of requirements allows for a relatively direct translation into an abst
 The datatypes \mintinline{scala}{Fingerprint} and \mintinline{scala}{KeyId} represent their PGP counterparts as defined in the OpenPGP message format according to \cite{callas1998openpgp}. The \mintinline{scala}{Identity} type serves as a simple wrapper for a string containing an email address. \mintinline{scala}{Key} combines the previously mentioned types into what our server model will treat as a representation of a full PGP key.
 \begin{code}
     \begin{minted}{scala}
-        trait Key {
-            def keyId: KeyId
-            def fingerprint: Fingerprint
-            def identities: Set[Identity]
-        }
+    trait Key {
+        def keyId: KeyId
+        def fingerprint: Fingerprint
+        def identities: Set[Identity]
+    }
     \end{minted}
 \caption{Definition of the abstract Key type}
 \end{code}
@@ -44,14 +45,14 @@ The datatypes \mintinline{scala}{Fingerprint} and \mintinline{scala}{KeyId} repr
 Given that we only needed a high-level representation of Hagrid, our implementation does not persist internal state. Instead, the model state is simply kept as a number of maps whose elements transition between each other: 
 \begin{code}
     \begin{minted}{scala}
-        class Server extends HagridInterface {
-            var keys: Map[Fingerprint, Key]
-            var uploaded: Map[Token, Fingerprint]
-            var pending: Map[Token, (Fingerprint, Identity)]
-            var confirmed: Map[Identity, Fingerprint]
-            var managed: Map[Token, Fingerprint]
-            ...
-        }
+    class Server extends HagridInterface {
+        var keys: Map[Fingerprint, Key]
+        var uploaded: Map[Token, Fingerprint]
+        var pending: Map[Token, (Fingerprint, Identity)]
+        var confirmed: Map[Identity, Fingerprint]
+        var managed: Map[Token, Fingerprint]
+        ...
+    }
     \end{minted} 
     \caption{Representation of the internal server state}
 \end{code}
@@ -62,22 +63,122 @@ Any of the actions exposed by the \mintinline{scala}{HagridInterface} (see defin
 For example, we can inspect the implementation of the \mintinline{scala}{upload} method
 \begin{code}
     \begin{minted}{scala}
-        def upload(key: Key): Token = {
-            val fingerprint = key.fingerprint
-    
-            if (keys contains fingerprint)
-            assert(keys(fingerprint) == key)
-    
-            val token = Token.unique
-            keys += (fingerprint -> key)
-            uploaded += (token -> fingerprint)
-            token
-      }
+    def upload(key: Key): Token = {
+        val fingerprint = key.fingerprint
+
+        if (keys contains fingerprint)
+        assert(keys(fingerprint) == key)
+
+        val token = Token.unique
+        keys += (fingerprint -> key)
+        uploaded += (token -> fingerprint)
+        token
+    }
     \end{minted}
     \caption{Implementation of \mintinline{Text}{upload()}}
 \end{code}
 
-we can see that both the \mintinline{scala}{keys} map, as well as the \mintinline{scala}{uploaded} map is being modified.
+we can see that both the \mintinline{scala}{keys} map, as well as the \mintinline{scala}{uploaded} map, is being modified. Note, that once a key has been uploaded, it remains present in the corresponding map forever. Any additional modifications such as verifying or revoking an identity will then be tracked by entries in \mintinline{scala}{confirmed}.
+
+\paragraph{Requesting verification of an identity} In contrast to simply uploading a key to the server, verifying or revoking an identity associated with some key is a two-step process.
+For example, the process of verifying an identity consists of an initial call to \mintinline{scala}{requestVerify}:
+\begin{code}
+    \begin{minted}{scala}
+    def requestVerify(from: Token, identities: Set[Identity]): Seq[Body] = {
+        if (uploaded contains from) {
+        val fingerprint = uploaded(from)
+        val key = keys(fingerprint)
+        if (identities subsetOf key.identities)
+            identities
+            .map(identity => {
+                val token = Token.unique
+                pending += (token -> (fingerprint, identity))
+                val email = Body(fingerprint, token, identity)
+                email
+            })
+            .toSeq
+        else Nil
+        } else Nil
+  }
+    \end{minted}
+\end{code}
+The method first checks whether the given set of identities actually belongs to the key associated with the supplied token. Assuming that this is the case, we then proceed to generate confirmation emails for each separate identity. This sequence of emails is then returned to the caller.
+
+In a second step, one may then proceed to call \mintinline{scala}{verify}, which implements the actual verification logic: 
+\begin{code}
+    \begin{minted}{scala}
+        def verify(token: Token) {
+            if (pending contains token) {
+                val (fingerprint, identity) = pending(token)
+                pending -= token
+                confirmed += (identity -> fingerprint)
+            }
+  }
+    \end{minted}
+\end{code}
+In this case, the method expects a valid token object, which can be obtained from the mail returned by \mintinline{scala}{requestVerify()}: 
+\begin{code}
+\begin{minted}{scala}
+case class EMail(message: String, fingerprint: Fingerprint, token: Token)
+\end{minted}
+\end{code}
+
+\paragraph{Requesting revocation of a verified identity} The process of revoking some previously verified identities follows the same pattern. First, one must issue a call to \mintinline{scala}{requestManage()}: 
+\begin{code}
+    \begin{minted}{scala}
+        def requestManage(identity: Identity): Option[EMail] = {
+            if (confirmed contains identity) {
+                val token = Token.unique
+                val fingerprint = confirmed(identity)
+                managed += (token -> fingerprint)
+                val email = EMail("manage", fingerprint, token)
+                return Some(email)
+            }
+            None
+  }
+    \end{minted}
+\end{code}
+One important difference to the verification process is that revocation happens on a per-key basis. That means that we can request a revocation token for a specific identity and then use that token to revoke several identities as long as they belong to the same key: 
+\begin{code}
+    \begin{minted}{scala}
+        def revoke(token: Token, identities: Set[Identity]) {
+        if (managed contains token) {
+            val fingerprint = managed(token)
+            val key = keys(fingerprint)
+            if (identities subsetOf key.identities) {
+                confirmed --= identities
+            }
+        }
+  }
+    \end{minted}
+\end{code}
+
+\paragraph{Filtering unverified identities from keys}
+Keeping track of which identities are verified at any given time alone is not sufficient. Instead, we also need to ensure that no unverified identity is ever returned by our model in response to a key request. 
+
+Therefore, we introduce a method \mintinline{scala}{filtered} which is responsible for excluding any unverified identity from the given key: 
+\begin{code}
+    \begin{minted}{scala}
+        private def filtered(key: Key): Key = {
+            def confirmedByFingerprint(key: Key) =
+            (for ((ident, fingerprint) <- 
+                    confirmed if key.fingerprint == fingerprint)
+                yield ident).toSet
+        
+        key restrictedTo confirmedByFingerprint(key)
+          }
+    \end{minted}
+\end{code}
+which subsequently calls \mintinline{scala}{restrictedTo}, returning a new \mintinline{scala}{PGPKey} instance containing only verified identities:
+\begin{code}
+    \begin{minted}{scala}
+    def restrictedTo(ids: Set[Identity]): Key = {
+        assert(ids subsetOf identities)
+        PGPKey(keyId, fingerprint, ids, armored)
+    }
+    \end{minted}
+\end{code}
+
 
 \paragraph{Invariants} 
 Internally, we defined several consistency invariants to ensure that our server model always behaves correctly. 
@@ -123,7 +224,6 @@ Any state manipulating action exposed by the server will trigger a re-evaluation
 \end{enumerate}
 
 
-\newpage
 \subsection{Simulating actions and responses with histories}
 The server model itself cannot execute any concrete actions without some accompanying actor that causes this action. Generally, we wanted to express the following abstract actions in a composable way: 
 \begin{itemize}
@@ -137,7 +237,7 @@ The server model itself cannot execute any concrete actions without some accompa
 As outlined in chapter \ref{sec:history_def}, we chose to denote the sequence of actions that should be simulated on the abstract server model through a ``history'' of abstract events.
 Through this approach, we can define a high-level model of \emph{what} operations should be executed in a specific order while keeping the \emph{how} - the concrete execution strategy - completely separate.
 
-Once again, the different kinds of events are closely related to the capabilities exposed by our server model. Specifically, we recognise three distinct event types, that are modelled as subclasses of a \mintinline{scala}{sealed trait Event}: 
+Once again, the different kinds of events are closely related to the capabilities exposed by our server model. Specifically, we recognize three distinct event types, that are modeled as subclasses of a \mintinline{scala}{sealed trait Event}: 
 \begin{code}
     \begin{minted}{scala}
     case class Revoke(ids: Set[Identity], fingerprint: Fingerprint) 
@@ -152,16 +252,16 @@ Once again, the different kinds of events are closely related to the capabilitie
 \end{code}
 
 A complete history then simply acts as a lightweight wrapper around a buffer of \mintinline{scala}{Event} objects:
-\begin{minted}[]{scala}
+\begin{minted}{scala}
 case class History(events: mutable.Buffer[Event] = mutable.Buffer())
 \end{minted}
 
 \subsection{History evaluation strategies}
-Given some history \emph{h} we want to determine precisely which associations between identities and keys should be visible depending on the combination of events in the history.
-To determine the visibility of an identity at any time, we introduce a \mintinline{scala}{State} type, that tags the current state of an identity throughout the evaluation of the history.
+Given some history \emph{h} we want to determine precisely which associations between identities and keys should be visible depending on the sequence of events in \(h\).
+To determine the visibility of an identity at any time, we introduce a \mintinline{scala}{State} type that tags the current state of an identity throughout the evaluation of the history.
 The state of an identity may take any of these three forms: 
 \begin{itemize}
-    \item Public: The identity has been confirmed and therefore publicly visible
+    \item Public: The identity has been confirmed and is therefore publicly visible
     \item Private: The identity has not been confirmed yet and therefore remains private
     \item Revoked: The identity had been confirmed at some prior point but has since been revoked.
 \end{itemize}
@@ -173,15 +273,18 @@ Depending on the currently folded value, one or several of the maps will be upda
 
 \begin{code}
     \begin{minted}{scala}
-    val withUploadedAndConfirmed = confirmed.foldLeft(withUploaded) { (acc, elem) =>
+val withUploadedAndConfirmed = confirmed.foldLeft(withUploaded) { 
+    (acc, elem) =>
         acc.get(elem._2) match {
             case Some(states) =>
                 acc updated(elem._2, 
-                        states - (elem._1 -> Private) - (elem._1 -> Revoked) + (elem._1 -> Public)
+                        states - (elem._1 -> Private) 
+                               - (elem._1 -> Revoked) 
+                               + (elem._1 -> Public)
                         )
             case _ => acc
         }
-    }.toMap
+}.toMap
     \end{minted}
     \caption{Adding confirmed identities to their associated key}
 \end{code}
@@ -192,39 +295,41 @@ The signature of the execution algorithm is given by \mintinline{scala}{def exec
 The algorithm then simply pattern matches the concrete event type and based on that type, calls the corresponding server method: 
 \begin{code}
     \begin{minted}{scala}
-        val uploaded: mutable.Map[Fingerprint, Token] = mutable.Map()
-        for (event <- history.events) {
-          event match {
-            case Event.Upload(key) =>
-              uploaded += ((key.fingerprint, server upload key))
-            case Event.Revoke(identities, _) =>
-              for {
+    val uploaded: mutable.Map[Fingerprint, Token] = mutable.Map()
+    for (event <- history.events) {
+        event match {
+        case Event.Upload(key) =>
+            uploaded += ((key.fingerprint, server upload key))
+        case Event.Revoke(identities, _) =>
+            for {
                 head <- identities
                 token <- server requestManage head map (_.token)
-              } server revoke(token, Set(head))
-            case Event.Verify(identities, fingerprint) =>
-              for {
+            } server revoke(token, Set(head))
+        case Event.Verify(identities, fingerprint) =>
+            for {
                 uploadToken <- uploaded.get(fingerprint)
-                Body(_, token, _) <- server requestVerify(uploadToken, identities)
-              } server verify token
-          }
+                Body(_, token, _) <- server
+                    .requestVerify(uploadToken, identities)
+            } server verify token
         }
+    }
     \end{minted}
     \caption{Sequential execution of a history}
 \end{code}
 
-As already mentioned in \ref{sec:history_def}, the history itself is completely unaware of \emph{how} it will be interpreted. In fact, the history is specifically asbtracting over any concrete execution details like having to receive and respond to confirmation mails.
+As already mentioned in chapter \ref{sec:history_def}, the history itself is completely unaware of \emph{how} it will be interpreted. In fact, the history is intentionally abstracting over any concrete execution details like having to follow the two-step verification process of first requesting a confirmation email and then completing the actual verification.
 
-\todo{This explanation is currently pretty bad and unfinished.}
-\todo{Maybe illustrate this with a diagram? Visualize the maps and how an event can change one or more of them. }
+% \todo{This explanation is currently pretty bad and unfinished.}
+% \todo{Maybe illustrate this with a diagram? Visualize the maps and how an event can change one or more of them. }
 
-\newpage
+% \newpage
 
-\subsection{Generating arbitrary histories with ScalaCheck}
-In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of HAGRID.
+\subsection{Generating and verifying histories with ScalaCheck}
+\label{sec:test_approach}
+In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of Hagrid.
 
 \subsubsection{Generating test data with ScalaCheck generators}
-We achieved this by utilizing a property based testing approach, in which all our test cases depend on a \emph{generator} of arbitrary histories. The basic functionality for generators is provided by ScalaCheck, which exposes an abstract type \mintinline{Scala}{Gen[T]} for some type \mintinline{Scala}{T}. This type can subsequently be used as a potentially infinite source of test data, over which we can then express some universally quantified property that this data should possess.
+We achieve this by utilizing a property-based testing approach, in which all our test cases depend on a \emph{generator} of arbitrary histories. The basic functionality for generators is provided by ScalaCheck, which exposes an abstract type \mintinline{Scala}{Gen[T]} for some type \mintinline{Scala}{T}. This type can subsequently be used as a potentially infinite source of test data, over which we can then express some universally quantified property that this data should possess.
 For example, the following code encodes the property that the act of taking the square root of any integer times itself should result in the original integer value: 
 \begin{minted}{Scala}
     val propSqrt = forAll { (n: Int) => 
@@ -232,33 +337,71 @@ For example, the following code encodes the property that the act of taking the 
     }
 \end{minted}
 
-We can now check that this property actually holds true by calling \mintinline{Scala}{propSqrt.check}. 
-ScalaCheck will now automatically check, whether this property holds true for some sufficiently large amount of integer values, which are provided by a built in integer generator. The result of executing the property check will confirm to us, what we already know -- namely that this property is obviously not true for any negative integer value: 
-\begin{minted}{Scala}
-scala> propSqrt.check
-! Falsified after 2 passed tests.
-> ARG_0: -1
-> ARG_0_ORIGINAL: -488187735
-\end{minted} 
+We can now verify whether this property holds by calling \mintinline{Scala}{propSqrt.check}. 
+ScalaCheck will automatically check, whether this property holds for some sufficiently large amount of integer values, which are provided by a built-in integer generator. The result of executing the property check will confirm to us, what we already know -- namely that this property is obviously not true for any negative integer value: 
+\begin{code}
+    \begin{minted}{Scala}
+    scala> propSqrt.check
+    ! Falsified after 2 passed tests.
+    > ARG_0: -1
+    > ARG_0_ORIGINAL: -488187735
+    \end{minted} 
+    \caption{ScalaCheck sample output}
+\end{code}
+
 What this output tells us, is that the first value found to falsify our property was \(n=-488187735\). ScalaCheck was then able to \emph{shrink} this failing instance down to the much simpler case of \(n=-1\).
 
-\subsubsection{Implementing a generator for histories}
-In order to ensure that all events within a single history refer to a consistent set of common PGP keys and identities, we first generate a context object that carries all relevant information: 
-
+\paragraph{Implementing a generator for histories} 
+While ScalaCheck does provide a set of built-in generators for common datatypes such as \mintinline{scala}{Int}, generators for more complex, custom types must be implemented by hand. Our history generator consists of two components: A generator for ``contexts'' which hold the set of available PGP keys and finally a generator for event sequences. 
+We generate such context objects, to ensure that all events within a single history refer to a consistent set of common PGP keys and identities:
 \begin{minted}{Scala}
     class Context(val keys: Map[Fingerprint, Key])
 
     def contextGen(keySize: Int, idsPerKey: Int)
-                  (implicit keyGen: Int => Gen[Key]): Gen[Context] = 
+                  (keyGen: Int => Gen[Key]): Gen[Context] = 
         for {
             keys <- Gen.listOfN(keySize,keyGen(keySize))
             keyMap = (keys map (k => (k.fingerprint, k))).toMap
         } yield new Context(keyMap)
 \end{minted}
 
-In a second step, our generator produces a random sequence of events, in which all necessary key data is provided by the current context.
+The method expects an implicit parameter \mintinline{scala}{keyGen} which handles the generation of PGP keys. Adding this abstraction over the concrete key generator is beneficial because it allows us to produce histories independent from the underlying structure of the PGP keys. As we will see in chapter \ref{sec:real_hagrid}, this is particularly useful, when the requirements for PGP keys change based on whether we are testing our abstract model or the actual Hagrid implementation.
 
-\begin{minted}{Scala}
+In the case of our abstract server model, the implementation of the key generator looks as follows: 
+\begin{code}
+    \begin{minted}{scala}
+    def identityGen: Gen[Identity] =
+        for (mail <- Gen.oneOf(Identity.mails)) 
+            yield Identity(mail)
+    
+    def identitySetGen(size: Int): Gen[Set[Identity]] =
+        for (identities <- Gen.listOfN(size, identityGen)) 
+            yield identities.toSet
+
+    def keyGen(idSize: Int): Gen[Key] =
+        for (id <- identitySetGen(idSize)) yield Key.random(id)
+    \end{minted}
+\end{code}
+
+We randomly choose a fixed number of identities from the predefined set \mintinline{scala}{Identity.mails} and pass them on to \mintinline{scala}{Key.random}: 
+\begin{code}
+    \begin{minted}{scala}
+    def random(ids: Set[Identity]): Key =
+        PGPKey(
+            keyId = KeyId.random,
+            fingerprint = Fingerprint.random,
+            identities = ids,
+            armored = ""
+        )
+    \end{minted}
+    \caption{Method for generating a random PGP key}
+\end{code}
+
+Note that the key returned by this method is not a true PGP key, as both \mintinline{scala}{KeyId.random} as well as \mintinline{scala}{Fingerprint.random} simply use \mintinline{scala}{UUID.randomUUID()} under the hood. 
+
+In a second step, our generator produces a random sequence of events, in which all necessary key data is provided by the current context.
+\begin{code}
+    \begin{minted}{Scala}
     def uploadEventGen(implicit context: Context): Gen[Event] =
         for ((_, key) <- Gen.oneOf(context.keys)) yield Event.Upload(key)
 
@@ -275,53 +418,99 @@ In a second step, our generator produces a random sequence of events, in which a
             (fingerprint, key) <- Gen.oneOf(context.keys)
             identities <- Gen.someOf(key.identities)
         } yield Event.Revoke(identities.toSet, fingerprint)
-\end{minted}
+    \end{minted}
+    \caption{Each event type has a separate generator}
+\end{code}
+
 
 Finally, we combine these separate event generators into a single generator that supports all three kinds of event types
-
-\begin{minted}{Scala}
+\begin{code}
+    \begin{minted}{Scala}
     def eventGen(implicit context: Context): Gen[Event] =
         Gen.oneOf(uploadEventGen, verifyEventGen, revokeEventGen)
-\end{minted}
+    \end{minted}
+    \caption{Generator that randomly selects a specific event type}
+\end{code}
+
 
 The complete history generator then simply combines both context and event generators and wraps the generated sequences in a \mintinline{Scala}{History} object.
-
-\begin{minted}{Scala}
+\begin{code}
+    \begin{minted}{Scala}
     def historyGen(length: Int)
                   (implicit keyGen: Int => Gen[Key]): Gen[History] =
         for {
             context <- contextGen(2, 2)(keyGen)
             events <- Gen.listOfN(length, eventGen(context))
         } yield History(events.toBuffer)
-\end{minted}
+    \end{minted}
+    \caption{Complete history generator}
+\end{code}
 
-\textbf{TODO: Explain role of keyGen: Int => Gen[Key]}
+\paragraph{Verifying generated histories}
+Given our implementation of a generator for histories, we can translate the formal condition for the validity of a Hagrid model from chapter \ref{sec:priv_condition}:
+\[
+    \forall h \in H \; .\; \text{Invalid}_h = \emptyset
+\]
+as a ScalaCheck property:
+\begin{code}
+    \begin{minted}{scala}
+property("CheckHagridValid") = forAll { gen: Gen[History] =>
+    forAll(gen) { history =>
+        val server = new Server
+        Sequential.execute(server, history)
+        val (fingerprintResult, mailResult) = history.check(server)
 
-\subsection{Initial approach to simulating actions through ``actors''}
-Our initial approach to simulating user actions was based on fine grained \emph{actors} that each encapsulated a specific capability. 
-Using this approach, any of the aforementioned operations would be represented by a single actor that runs on a simple state machine.
-The actor trait is defined as following:
-\begin{minted}{scala}
-    trait Actor {
-        def canAct: Boolean
-        def act(): Unit
-      
-        val inbox = mutable.Queue[Data]()
-        def canReceive = inbox.nonEmpty
-      
-        def isActive = canAct || canReceive
-      
-        def handle(from: Actor, msg: Message)
-        def handle(from: Actor, msg: Body)
-        def send(to: Actor, msg: Message): Unit = 
-            Network.send(this, to, msg)
-        def send(to: Identity, msg: Body): Unit = 
-            Network.send(this, to, msg)
-      
-        def register(identity: Identity): Unit = 
-            Network.register(identity, this)
+        val successFingerprint = mailResult.forall {
+            case (_, idMap) => idMap.forall(_._2 == EvalResult.Ok)
+        }
+        val successMail = fingerprintResult.forall {
+            case (_, idMap) => idMap.forall(_._2 == EvalResult.Ok)
+        }
+        successFingerprint && successMail
     }
-\end{minted}
-An actor could define a custom \mintinline{scala}{act()} method that would initialize the specific action of this actor. Any future interaction with another actor would then be handled by the actors \mintinline{scala}{handle()} method. 
+}
+    \end{minted}
+    \caption{Universally quantified validity constraint over histories}
+\end{code}
 
-\todo{TODO}: Describe why there were two different handle methods. What is Network? What was bad about this approach? Show execution strategy and why order of execution was a problem.
+Note that instead of defining our property directly over an arbitrary history, we receive an instance of \mintinline{scala}{Gen[History]}. This allows us to define a ScalaCheck generator that in turn produces generators of histories of different lengths: 
+\begin{code}
+    \begin{minted}{scala}
+    val MinHistorySize = 10
+    val MaxHistorySize = 20
+
+    def sizedHistoryGen(implicit keyGen: Int => Gen[Key]) =
+        for {
+            size <- Gen.choose(MinHistorySize, MaxHistorySize)
+        } yield randomHistory(size)
+    \end{minted}
+    \caption{Nested generator for histories of different sizes}
+\end{code}
+
+This extra step of indirection thus allows us to check our privacy constraint over histories of different event sequences as well as different sizes.
+\paragraph{Ensuring that invalid server behaviour is recognised}
+In order to verify that this property is capable of detecting invalid behaviour on the server-side, we define a second property:
+\begin{code}
+    \begin{minted}{scala}
+property("CheckHagridInvalid") = forAll { gen: Gen[History] =>
+    forAll(gen) { history =>
+        val server = new ServerOld
+        Sequential.execute(server, history)
+        val (fingerprintResult, mailResult) = history.check(server)
+
+        val successFingerprint = mailResult.forall {
+            case (_, idMap) => idMap.forall(_._2 == EvalResult.Ok)
+        }
+        val successMail = fingerprintResult.forall {
+            case (_, idMap) => idMap.forall(_._2 == EvalResult.Ok)
+        }
+        successFingerprint && successMail
+    }
+}
+    \end{minted}
+    \caption{Property that tests a faulty server implementation}
+\end{code}  
+
+In this case, we create an instance of the type \mintinline{scala}{ServerOld}, which behaves the same way as the standard server implementation, except that it does not filter the identities of its keys. 
+
+\textbf{TODO: Show output for both valid and invalid history runs!}
