@@ -22,21 +22,25 @@ HAGRID itself defines a specific interface, through which external applications 
 In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to Hagrid via HTTP.
 
 As an example, lets look at the \mintinline{scala}{upload} method: 
-\begin{minted}{scala}
-override def upload(key: Key): Token = {
-    val response = basicRequest
-        .post(hag("/vks/v1/upload"))
-        .body(UploadBody(key.armored))
-        .response(asJson[UploadResponse])
-        .send()
-        .body
-
-    Token(response
-    .toOption
-    .get
-    .token)
-  }
-\end{minted}
+\begin{code}
+    \begin{minted}{scala}
+    override def upload(key: Key): Token = {
+        val response = basicRequest
+            .post(hag("/vks/v1/upload"))
+            .body(UploadBody(key.armored))
+            .response(asJson[UploadResponse])
+            .send()
+            .body
+    
+        Token(response
+        .toOption
+        .get
+        .token)
+        }
+    \end{minted}
+    \caption{Uploading a PGP key to the real Hagrid server}
+\end{code}
+\label{code:hagrid_upload}
 First, we construct a \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
 The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token, which we require in order to send any verification requests at a later point.
 
@@ -79,12 +83,39 @@ More specifically, we define a method, that blocks its execution until it has su
 \label{code:consumeMail}
 where the returned sequence of mail bodies takes the form of:
 \begin{minted}{scala}
-case class Body(
-    fingerprint: Fingerprint, 
-    token: Token, 
-    identity: Identity
-)
+    case class Body(
+        fingerprint: Fingerprint, 
+        token: Token, 
+        identity: Identity
+    )
 \end{minted}
+
+Based on this helper method, we can implement \mintinline{scala}{requestVerify}, which sends a verification request and waits for a corresponding verification email:
+\begin{code}
+    \begin{minted}{scala}
+    def requestVerify(from: Token, emails: Set[PgpIdentity]) = {
+        if (emails.isEmpty) return Seq.empty
+        val response = basicRequest
+            .post(hag("/vks/v1/request-verify"))
+            .body(VerifyRequest(from.uuid, 
+                  emails.map(_.email).toList)
+                 ).send()
+            .body.toOption
+
+        val shouldReadMail = checkResponse(
+            emails.map(_.email), 
+            response)
+
+        (response, shouldReadMail) match {
+            case (Some(x), true) => consumeMail(emails.size)
+            case _ => Seq.empty
+        }
+    }
+    \end{minted}
+    \caption{Requesting verification of a set of identities}
+\end{code}
+
+As one can see, we make use of a helper method \mintinline{scala}{checkResponse} which parses the server response and checks whether our verification request has had any effect. This is important because Hagrid will ignore requests for verification of already verified identities and thus skip the process of sending an additional verification email. If we simply ignored this, \mintinline{scala}{consumeMail} would wait indefinitely for a corresponding email that will never be sent. 
 
 \paragraph{Parsing plain text confirmation mails}
 To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by Hagrid in response to a confirmation request might look like this: 
@@ -163,11 +194,30 @@ For example, we would represent \mintinline{scala}{KeyId} or \mintinline{scala}{
 When communicating with the actual Hagrid implementation, that solution is obviously insufficient because Hagrid verifies all incoming PGP keys for proper formatting and structure. To solve this problem, we decided to implement a mechanism capable of generating valid PGP keys. 
 For this purpose, we use \emph{BouncyCastle}\footnote{https://www.bouncycastle.org/}, which is a Java library for cryptographic use cases.
 
-The general signature to generate a PGP key is as following: 
+We define a new method that expects a set of identities and returns a tuple consisting of the BouncyCastle encoding of a public key and a string containing the armored key text:
 \begin{minted}{scala}
-    def genPublicKey(identities: Set[Identity]): (PGPPublicKey, String)
+def genPublicKey(identities: Set[Identity]): (PGPPublicKey, String)
 \end{minted}
-It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable.
+
+Building upon this method, we can now define a new convenience method for constructing valid PGP keys given a set of identities: 
+\begin{code}
+    \begin{minted}{scala}
+    def pgp(ids: Set[Identity]): Key = {
+        val (pgpKey, armored) = KeyGenerator.genPublicKey(ids)
+    
+        PGPKey(
+            keyId = KeyIdImpl(pgpKey.getKeyID.toString),
+            fingerprint = FingerprintImpl(
+                convertBytesToHex(
+                    pgpKey.getFingerprint
+                ).toUpperCase),
+            identities = ids,
+            armored = armored
+        )
+    }
+    \end{minted}
+\end{code}
+It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable. This restriction is currently implemented in the generator types mentioned in chapter \ref{sec:test_approach} which limit the amount of identities per key to a maximum value of two.
 \paragraph{Running tests against a local Hagrid instance} Given that our test approach outlined in chapter \ref{sec:test_approach} is fully agnostic towards the underlying server implementation, adding support for Hagrid only required us to adhere to the API contract given by \mintinline{scala}{HagridInterface}.
 \subsection{Initializing}
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
