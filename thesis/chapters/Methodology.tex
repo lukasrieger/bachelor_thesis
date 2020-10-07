@@ -256,8 +256,38 @@ A complete history then simply acts as a lightweight wrapper around a buffer of 
 case class History(events: mutable.Buffer[Event] = mutable.Buffer())
 \end{minted}
 
+\subsection{Executing a history on the server model}
+Given a history and the computed privacy state based on that history, we can now define a simple execution strategy that sequentially loops through the history and sends the corresponding data to the server. The signature of the execution algorithm is given by \mintinline{scala}{def execute(server: HagridInterface, history: History): Unit}.
+The algorithm then simply pattern matches the concrete event type and based on that type, calls the corresponding server method: 
+\begin{code}
+    \begin{minted}{scala}
+    val uploaded: mutable.Map[Fingerprint, Token] = mutable.Map()
+    for (event <- history.events) {
+        event match {
+        case Event.Upload(key) =>
+            uploaded += ((key.fingerprint, server upload key))
+        case Event.Revoke(identities, _) =>
+            for {
+                head <- identities
+                token <- server requestManage head map (_.token)
+            } server revoke(token, Set(head))
+        case Event.Verify(identities, fingerprint) =>
+            for {
+                uploadToken <- uploaded.get(fingerprint)
+                Body(_, token, _) <- server
+                    .requestVerify(uploadToken, identities)
+            } server verify token
+        }
+    }
+    \end{minted}
+    \caption{Sequential execution of a history}
+\end{code}
+
+As mentioned in chapter \ref{sec:history_def}, the history itself is completely unaware of \emph{how} it will be interpreted. In fact, the history is intentionally abstracting over any concrete execution details like having to follow the two-step verification process of first requesting a confirmation email and then completing the actual verification.
+
+
 \subsection{History evaluation strategies}
-Given some history \emph{h} we want to determine precisely which associations between identities and keys should be visible depending on the sequence of events in \(h\).
+Given some history \emph{h} we now want to determine precisely which associations between identities and keys should be visible depending on the sequence of events in \(h\).
 To determine the visibility of an identity at any time, we introduce a \mintinline{scala}{State} type that tags the current state of an identity throughout the evaluation of the history.
 The state of an identity may take any of these three forms: 
 \begin{itemize}
@@ -289,46 +319,39 @@ val withUploadedAndConfirmed = confirmed.foldLeft(withUploaded) {
     \caption{Adding confirmed identities to their associated key}
 \end{code}
 
-\paragraph{Executing a history on the server model}
-Given a history and the computed privacy state based on that history, we can now define a simple execution strategy that sequentially loops through the history and sends the corresponding data to the server.
-The signature of the execution algorithm is given by \mintinline{scala}{def execute(server: HagridInterface, history: History): Unit}.
-The algorithm then simply pattern matches the concrete event type and based on that type, calls the corresponding server method: 
+In a second step, this mapping from keys to \mintinline{text}{(Identity,Status)} tuples is compared to the state of all available identities coming from the server model.
+To this end, we collect the total server state in a \mintinline{scala}{Map[Fingerprint,Set[Identity]]}, mapping each requested key to the set of identities we received. 
+Next, we simply compare this set of identities to the corresponding set of \mintinline{text}{(Identity,Status)} tuples which we determined earlier. The result of this comparison is encoded in a \mintinline{scala}{EvalResult} type, which is a discriminated union between of the types \mintinline{scala}{Ok} and \mintinline{scala}{Mismatch}: 
 \begin{code}
     \begin{minted}{scala}
-    val uploaded: mutable.Map[Fingerprint, Token] = mutable.Map()
-    for (event <- history.events) {
-        event match {
-        case Event.Upload(key) =>
-            uploaded += ((key.fingerprint, server upload key))
-        case Event.Revoke(identities, _) =>
-            for {
-                head <- identities
-                token <- server requestManage head map (_.token)
-            } server revoke(token, Set(head))
-        case Event.Verify(identities, fingerprint) =>
-            for {
-                uploadToken <- uploaded.get(fingerprint)
-                Body(_, token, _) <- server
-                    .requestVerify(uploadToken, identities)
-            } server verify token
+    (state, serverState) match {
+        case (None, None) => EvalResult.Ok
+        case (None, Some(id)) => EvalResult.Mismatch(None, Some(id))
+        case (Some((id, Private)), None) => EvalResult.Ok
+        case (Some((id, Public)), None) =>
+            EvalResult.Mismatch(Some((id, Public)), None)
+        case (Some((id, Revoked)), None) => EvalResult.Ok
+
+        case (Some((identity, Private)), Some(id)) =>
+            EvalResult.Mismatch(Some((identity, Private)), Some(id))
+        case (Some((identity, Public)), Some(id)) => EvalResult.Ok
+        case (Some((identity, Revoked)), Some(id)) =>
+            EvalResult.Mismatch(Some((identity, Revoked)), Some(id))
         }
-    }
     \end{minted}
-    \caption{Sequential execution of a history}
+    \caption{Comparison between a computed state and a server state}
 \end{code}
 
-As already mentioned in chapter \ref{sec:history_def}, the history itself is completely unaware of \emph{how} it will be interpreted. In fact, the history is intentionally abstracting over any concrete execution details like having to follow the two-step verification process of first requesting a confirmation email and then completing the actual verification.
+In this case, the left side of our \mintinline{scala}{Mismatch} type contains the information we computed by evaluating the history, while the right side contains the server response. For example, the case in which we determined that a given Identity is \mintinline{text}{Private} but was still included in the server response would be encoded in the following way: \mintinline{scala}{Mismatch(Some((identity, Private)), Some(id))}
 
-% \todo{This explanation is currently pretty bad and unfinished.}
-% \todo{Maybe illustrate this with a diagram? Visualize the maps and how an event can change one or more of them. }
+Finally, all these steps are combined in a single method \mintinline{scala}{check()} which returns a \mintinline{scala}{Map[Fingerprint, Map[Identity, EvalResult]]} and basically encodes the \(\text{Valid}\) and \(\text{Invalid}\) sets we introduced in chapter \ref{sec:history_def} using a different format. 
 
-% \newpage
 
 \subsection{Generating and verifying histories with ScalaCheck}
 \label{sec:test_approach}
 In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of Hagrid.
 
-\subsubsection{Generating test data with ScalaCheck generators}
+\paragraph{Generating test data with ScalaCheck generators}
 We achieve this by utilizing a property-based testing approach, in which all our test cases depend on a \emph{generator} of arbitrary histories. The basic functionality for generators is provided by ScalaCheck, which exposes an abstract type \mintinline{Scala}{Gen[T]} for some type \mintinline{Scala}{T}. This type can subsequently be used as a potentially infinite source of test data, over which we can then express some universally quantified property that this data should possess.
 For example, the following code encodes the property that the act of taking the square root of any integer times itself should result in the original integer value: 
 \begin{minted}{Scala}
@@ -423,7 +446,7 @@ In a second step, our generator produces a random sequence of events, in which a
 \end{code}
 
 
-Finally, we combine these separate event generators into a single generator that supports all three kinds of event types
+Finally, we combine these separate event generators into a single generator that supports all three kinds of event types:
 \begin{code}
     \begin{minted}{Scala}
     def eventGen(implicit context: Context): Gen[Event] =

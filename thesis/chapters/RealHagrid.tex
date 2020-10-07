@@ -5,9 +5,7 @@ Assuming that the maintainers of Hagrid would likely not appreciate it if their 
 
 \paragraph{Communicating with Hagrid}
 The main effort of integrating Hagrid into our implementation focussed on the relaying and receiving of messages between our Scala frontend and Hagrid.
-To this end, we use \emph{Sttp}\footnote{https://sttp.softwaremill.com/en/latest/}, which is a simple library that enables us to communicate with the server through REST-full HTTP calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe}\footnote{https://circe.github.io/circe/} as a dependency.
-
-HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}\footnote{https://keys.openpgp.org/about/api}, exposes the following endpoints: 
+To this end, we use \emph{Sttp}\footnote{https://sttp.softwaremill.com/en/latest/}, which is a simple library that enables us to communicate with the server through REST-full HTTP calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe}\footnote{https://circe.github.io/circe/} as a dependency. HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}\footnote{https://keys.openpgp.org/about/api}, exposes the following endpoints: 
 \begin{figure}[h]
     \begin{itemize}
         \item \mintinline{text}{GET}  \mintinline{text}{/vks/v1/by-fingerprint/FINGERPRINT}
@@ -19,9 +17,7 @@ HAGRID itself defines a specific interface, through which external applications 
     \caption{HTTP endpoints defined by Hagrid}
 \end{figure}
 
-In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to Hagrid via HTTP.
-
-As an example, lets look at the \mintinline{scala}{upload} method: 
+In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to Hagrid via HTTP. As an example, let's look at the \mintinline{scala}{upload} method: 
 \begin{code}
     \begin{minted}{scala}
     override def upload(key: Key): Token = {
@@ -32,10 +28,7 @@ As an example, lets look at the \mintinline{scala}{upload} method:
             .send()
             .body
     
-        Token(response
-        .toOption
-        .get
-        .token)
+        Token(response.toOption.get.token)
         }
     \end{minted}
     \caption{Uploading a PGP key to the real Hagrid server}
@@ -44,19 +37,18 @@ As an example, lets look at the \mintinline{scala}{upload} method:
 First, we construct a \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
 The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token, which we require in order to send any verification requests at a later point.
 
-Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with Hagrid. We are aware that his my cause unforeseen problems in some edge-cases, like the local Hagrid instance suddenly crashing.
+Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with Hagrid. We are aware that this may cause unforeseen problems in some edge-cases, like the local Hagrid instance suddenly crashing.
 
 \subsection{Receiving verification mails from HAGRID}
-While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world Hagrid server. 
-
-During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
+While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world Hagrid server. During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
 Luckily, we discovered that HAGRID also provides an alternative mode of operation, in which all email transfer is handled directly through the filesystem.
 Hagrid uses a configuration file called \mintinline{text}{Rocket.toml}, which allows us to specify a folder to be used as the destination for all outgoing Hagrid emails.   
 Modifying the configuration file by adding the line \mintinline{text}{mail_folder=/PATH/TO/DESTINATION} therefore causes HAGRID to write all emails to a unique file in the specified folder.
 
 This allows us to simply observe the given directory and react to any file modifications within the folder.
-More specifically, we define a method, that blocks its execution until it has successfully read the expected amount of emails: 
+More specifically, we define a method that blocks its execution until it has successfully read the expected amount of emails: 
 \begin{code}
+    
     \begin{minted}{scala}
     def consumeMail(expectedSize: Int): Seq[Body] = {
         val watchKey = mailWatcher.take
@@ -79,8 +71,9 @@ More specifically, we define a method, that blocks its execution until it has su
     }
     \end{minted}
     \caption{Reading Hagrid's emails by observing filesystem changes}
+    \label{code:consumeMail}
 \end{code}
-\label{code:consumeMail}
+
 where the returned sequence of mail bodies takes the form of:
 \begin{minted}{scala}
     case class Body(
@@ -115,7 +108,7 @@ Based on this helper method, we can implement \mintinline{scala}{requestVerify},
     \caption{Requesting verification of a set of identities}
 \end{code}
 
-As one can see, we make use of a helper method \mintinline{scala}{checkResponse} which parses the server response and checks whether our verification request has had any effect. This is important because Hagrid will ignore requests for verification of already verified identities and thus skip the process of sending an additional verification email. If we simply ignored this, \mintinline{scala}{consumeMail} would wait indefinitely for a corresponding email that will never be sent. 
+As one can see, we make use of a helper method \mintinline{scala}{checkResponse} which parses the server response and checks whether our verification request has had any effect. This is important because Hagrid will ignore requests for verification of already verified identities and will thus skip the process of sending an additional verification email. If we simply ignored this, \mintinline{scala}{consumeMail} would wait indefinitely for a corresponding email that will never be sent. 
 
 \paragraph{Parsing plain text confirmation mails}
 To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by Hagrid in response to a confirmation request might look like this: 
@@ -165,7 +158,7 @@ We use a regular expression to parse the relevant information from these mails. 
     \caption{Parsing relevant information from Hagrid emails}
 \end{code}
 
-As seen in the code sample in chapter \ref{code:consumeMail}, this function is responsible for parsing the mails read by \mintinline{scala}{consumeMail} from the dedicated mail directory.
+As seen in code sample \ref{code:consumeMail}, this function is responsible for parsing the mails read by \mintinline{scala}{consumeMail} from the dedicated mail directory.
 
 \subsection{Generating valid PGP keys}
 In the context of our abstract Hagrid model we were able to rely on a simplified implementation of our PGP \mintinline{scala}{Key} type: 
@@ -223,7 +216,7 @@ It should be noted though that we currently do not support the generation of key
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
 In contrast to this, our high-level model of HAGRID maintains no state at all between any two separate test runs.
 
-This is problematic, because our testing approach fundamentally relies on a limited amount of \emph{Identities}, that are subsequently used to construct PGP Keys. This would necessarily lead to unexpected results when applying our approach to HAGRID, where there could potentially already be an identity associated to some PGP key, that was uploaded during a previous testing session. 
+This is problematic because our testing approach fundamentally relies on a limited amount of \emph{Identities} that are subsequently used to construct PGP Keys. This would necessarily lead to unexpected results when applying our approach to HAGRID, where there could potentially already be an identity associated to some PGP key that was uploaded during a previous testing session. 
 To elaborate on this problem, let us assume these two separate test runs in pseudo-code:
 
 Assuming that there exists a value \mintinline{scala}{key1 = Key(identity1,identity2)} and a value \mintinline{scala}{key2 = Key(identity3,identity4)}
@@ -247,9 +240,9 @@ Assuming that there exists a value \mintinline{scala}{key1 = Key(identity1,ident
     \end{minipage}
 \end{figure}
 
-Looking \emph{only} at test run 2 we would expect an outcome, in which the server returns no public keys/identities at all. Instead, when we actually execute these two runs in sequential order, we receive a PGP key when querying the server with \mintinline{scala}{identity1}, even though we \emph{never} uploaded it during the second test. 
+Looking \emph{only} at test run 2, we would expect an outcome in which the server returns no public identities at all. Instead, when we actually execute these two runs in sequential order, we receive a PGP key when querying the server with \mintinline{scala}{identity1} even though we \emph{never} uploaded it during the second test. 
 Any solution to this problem therefore requires us to reset the internal state of HAGRID after having completed a test.
-This in turn also imposes an additional non trivial performance penalty on the execution speed of our ScalaCheck test, besides the slowdown caused by having to generate real PGP keys. 
-For our current solution to this problem, we decided to compile HAGRID into a static image. This allows us to create a fresh instance of HAGRID at the beginning of each test iteration and shutting it down afterwards, at which point we simply clear the local directory of PGP keys. This ensures that each test run starts on a truly equal playing field.
+This in turn also imposes an additional non-trivial performance penalty on the execution speed of our ScalaCheck test, besides the slowdown caused by having to generate real PGP keys. 
+For our current solution to this problem, we decided to compile HAGRID into a static image. This allows us to create a fresh instance of HAGRID at the beginning of each test iteration and shutting it down afterward, at which point we simply clear the local directory of PGP keys. This ensures that each test run starts on a truly equal playing field.
 
 

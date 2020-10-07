@@ -1,4 +1,13 @@
 
 \section{Related Work}
 \label{sec:related_work}
-\newpage
+
+Within the context of the VerifyThis2020 challenge, several approaches have been introduced that all aim at verifying certain properties of HAGRID.
+For example, several teams were able to implement simplified models of HAGRID and verify the functional correctness of their implementation. In this context, functional correctness means, that the given model was shown to adhere to the specification of HAGRID given by the challenge creators. 
+
+For example, \citeauthor{VTLTC2020/KeY} were able to verify that operations, which require a confirmation token such as requesting  the verification of an identitiy were invoked with the \emph{correct} confirmation token. Furthermore, by using a program verification engine called ``KeY'', they were able to guarantee both the ``absence of runtime exceptions and a guaranteed termination of each request handler''\cite{VTLTC2020/KeY}.
+
+Conversely, the submission by \citeauthor{VTLTC2020/IFVerify} focussed on verifying similar information flow policies as the one explored in this thesis. Yet, instead of relying on runtime tests, their approach is based on the verifier SecC, which ``automates program reasoning in the Hoare style logic Security Concurrent Separation Logic (SecCSL)''\cite{VTLTC2020/IFVerify}. Therefore, this approach is capable of verifying the chosen information flow policies by proofing that their abstract model adheres to them instead of relying on the execution of runtime tests. 
+
+\bigskip
+In regards to the dynamic declassification policy that we discussed in this thesis, there exist some further approaches that are capable of a more rigid verification than we were able to achieve. For example, we mentioned the approach of \citeauthor{Lourenco_Caires_15} which is based on Dependent Type Theory. Therefore, their approach is theoretically capable of enforcing value-dependent policies such as the one outlined in chapter \ref{sec:history_def} on the type level.

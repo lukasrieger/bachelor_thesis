@@ -3,23 +3,14 @@
 Throughout the last decade, the advancements of digital technology have given rise to many novel ways of organizing and sharing information on a global level.
 Reaching from simple email applications to large social media platforms, these advancements have fundamentally changed how we interact with information and especially with each other.
 And yet, while many of these applications have undoubtedly had a largely positive impact on our productivity and everyday life, they have also sparked concerns about the privacy and authenticity of the information within these applications. 
-\textbf{TODO: Verify2020 must be mentioned here!}
+One approach to this problem is to formally reason about the flow of information within these applications. By doing this, one can enforce that the underlying system is  
 
-In this thesis, we formalize the claimed privacy features of one such solution -- a public PGP server implementation called Hagrid -- verifying the validity of these claims by running tests both on an abstract model as well as the concrete implementation.
-Chapter 1 will give a short introduction to the domain of public PGP servers by summarizing their internal structure and general behaviour. In Chapter 2, we then go on to address the origin and development of Hagrid. Next, Chapter 3 focusses on the theoretical background of information flow and briefly discusses a number of central terms that have been used in the past to classify and analyze different kinds of information flow.
-Chapter 4 then handles the central aspect of this thesis, which is the formal description and explanation of the privacy constraints defined by Hagrid. Chapter 5 then goes on to describe our concrete test implementation of the constraints laid out in Chapter 4.
-Chapter 5 details several related approaches specifically in the context of the VerifiyThis2020 challenge, that focus on information flow testing of Hagrid.
-Chapter 6 then ends with a short conclusion, reflecting on the work in this thesis. 
+In this thesis, we formalize the claimed privacy features of a public PGP server implementation called Hagrid, verifying the validity of these claims by running tests both on an abstract model as well as the concrete implementation. Specifically, we present a \emph{history} based approach which encodes the interaction with the server in an abstract manner and allows us to test both functional correctness and security. That is, our approach enables us to determine precisely which information may or may not be declassified by the system, therefore enabling us to detect privacy leaks as well as missing public information. To this end, we first implemented an abstract model of HAGRID using Scala that serves as the basis for our testing approach. At a later stage, we extended our efforts by adding a separate model capable of communicating with the actual HAGRID server.
 
+The preliminary results of our testing efforts have also been published as part of the proceedings of the VerifyThis2020\footnote{https://verifythis.github.io/} verification challenge, which is a yearly competition in which participating teams are given challenges for program verification \cite{VTLTC2020/IFTesting}. In fact, this challenge served as the initial foundation for this thesis by outlining HAGRID as this year's chosen verification target.
 
-\cite{austin2009efficient}
-\cite{BanerjeeNR08}
-\cite{callas1998openpgp}
-\cite{chudnov2014information}
-\cite{chudnov2018assuming}
-\cite{claessen2011quickcheck}
-\cite{Goguen_Meseguer_82}
-\cite{Lourenco_Caires_15}
-\cite{myers2001jif}
-\cite{Zheng_Myers_07}
-\cite{CVE_2019}
+Chapter 2 of this thesis will give a brief summary of HAGRID's development history and the initial circumstances that gave rise to the project. Next, Chapter 3 focusses on the theoretical background of information flow and briefly discusses a number of central terms that have been used in the past to classify and analyze different kinds of information flow.
+Chapter 4 then handles the central aspect of this thesis, which is the formal description and explanation of the privacy constraints defined by Hagrid. Chapter 4 then goes on to describe our concrete test implementation of the constraints laid out in Chapter 3.
+Chapter 4 details several related approaches specifically in the context of the VerifiyThis2020 challenge, that focus on information flow testing of Hagrid.
+Chapter 5 then summarizes the results of our works and reflects on some of the challenges we faced during development.
+

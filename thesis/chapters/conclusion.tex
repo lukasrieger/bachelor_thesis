@@ -1,31 +1,3 @@
 
 \section{Conclusion}
-
-\subsection{Initial approach to simulating actions through ``actors''}
-Our initial approach to simulating user actions was based on fine grained \emph{actors} that each encapsulated a specific capability. 
-Using this approach, any of the aforementioned operations would be represented by a single actor that runs on a simple state machine.
-The actor trait is defined as following:
-\begin{minted}{scala}
-    trait Actor {
-        def canAct: Boolean
-        def act(): Unit
-      
-        val inbox = mutable.Queue[Data]()
-        def canReceive = inbox.nonEmpty
-      
-        def isActive = canAct || canReceive
-      
-        def handle(from: Actor, msg: Message)
-        def handle(from: Actor, msg: Body)
-        def send(to: Actor, msg: Message): Unit = 
-            Network.send(this, to, msg)
-        def send(to: Identity, msg: Body): Unit = 
-            Network.send(this, to, msg)
-      
-        def register(identity: Identity): Unit = 
-            Network.register(identity, this)
-    }
-\end{minted}
-An actor could define a custom \mintinline{scala}{act()} method that would initialize the specific action of this actor. Any future interaction with another actor would then be handled by the actors \mintinline{scala}{handle()} method. 
-
-\todo{TODO}: Describe why there were two different handle methods. What is Network? What was bad about this approach? Show execution strategy and why order of execution was a problem.
+In this thesis, we aimed to test 

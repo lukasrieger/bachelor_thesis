@@ -65,20 +65,20 @@ For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though th
         \node[state]          (B) [above right of=A]   {$U$};
         \node[state]          (C) [below right of=B]   {$C$};
         \node[state]          (E) [below       of=B]   {$E$};
-        \node[state]          (D) [below right  of=E]  {$R$};
+        \node[state]          (D) [below right of=E]   {$R$};
 
     
-        \path   (A)     edge               node {$\text{Upload}_{i,k}$}          (B)
-                        
-                (B)     edge               node {$\text{Verify}_{i,k}$}          (C)
-                (C)     edge [bend left]   node {$\text{Revoke}_{i,k}$}          (D)
-                (D)     edge [bend left]   node[pos=0.7] {$\text{Verify}_{i,k}$}          (C)
-                (B)     edge               node {$\text{Get}_{i,k}$}               (E)
-                (A)     edge               node[pos=0.3] {$\text{Get}_{i,k}$}               (E)
-                (D)     edge [bend left]   node[above right] {$\text{Get}_{i,k}$}               (E)
-                (E)     edge [bend left]   node  {$\epsilon$}                    (A)
-                        edge [bend left]   node {$\epsilon$}                    (B)
-                        edge [bend right=70]  node  {$\epsilon$}                    (D);
+        \path   (A)     edge                  node               {$\text{Upload}_{i,k}$}    (B)                        
+                (B)     edge                  node               {$\text{Verify}_{i,k}$}    (C)
+                (C)     edge [bend left]      node               {$\text{Revoke}_{i,k}$}    (D)
+                        edge [loop right]     node               {$\text{Get}_{i,k}$}       (C)
+                (D)     edge [bend left]      node [pos=0.7]     {$\text{Verify}_{i,k}$}    (C)
+                (B)     edge                  node               {$\text{Get}_{i,k}$}       (E)
+                (A)     edge                  node [pos=0.3]     {$\text{Get}_{i,k}$}       (E)
+                (D)     edge [bend left]      node [above right] {$\text{Get}_{i,k}$}       (E)
+                (E)     edge [bend left]      node               {$\epsilon$}               (A)
+                        edge [bend left]      node               {$\epsilon$}               (B)
+                        edge [bend right=70]  node               {$\epsilon$}               (D);
     
     \end{tikzpicture}
     \caption{Visualization of a state machine over a history}
