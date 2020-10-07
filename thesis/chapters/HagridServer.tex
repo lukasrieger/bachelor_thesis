@@ -1,32 +1,30 @@
 
 
-Hagrid is a modern PGP key server that has been available since June 2019 under \url{https://keys.openpgp.org}. 
-Initially, this project was not intended to be a full fledged replacement of existing key servers such as SKS - available at \url{https://sks-keyservers.net/}) - but was created to be used as a testing tool in various experiments for a new implementation of the OpenPGP standard under the name of ``Sequoia''.
+HAGRID is a modern PGP key server that has been available since June 2019 under \url{https://keys.openpgp.org}. 
+Initially, this project was not intended to be a full-fledged replacement of existing key servers such as SKS - available at \url{https://sks-keyservers.net/}) - but was created to be used as a testing tool in various experiments for a new implementation of the OpenPGP standard under the name of ``Sequoia''.
 
-Sequoia has been in development since early 2018 and is intended to be a performant and modern implementation of the OpenPGP standard written in the Rust programming language.
+Sequoia has been in development since early 2018 and is intended to be a performant and modern implementation of the OpenPGP standard written in the Rust programming language \cite{sequoia_blog}.
 
-As outlined in one of the early developer blogs of Sequoia, concerns about the future and reliability of existing solutions like SKS and questions about how recent data protection regulations such as the GDPR would be addressed by these solutions finally lead to Hagrid evolving into a serious project aiming to provide a reliable key server implementation based on the Sequoia at its core.
+As outlined in one of the early developer blogs of Sequoia\footnote[1]{\label{footnote}https://sequoia-pgp.org/blog/2019/06/14/20190614-hagrid/}, concerns about the future and reliability of existing solutions like SKS and questions about how recent data protection regulations such as the GDPR would be addressed by these solutions finally lead to HAGRID evolving into a serious project aiming to provide a reliable key server implementation based on the Sequoia at its core \cite{sequoia_blog}.
 
 
-\paragraph{How Hagrid avoids the mistakes of the past}
+\paragraph{How HAGRID avoids the mistakes of the past}
 \label{sec:hagrid_solves}
-Besides the already mentioned concerns about the effects of recent changes in data protection laws, Hagrid also attempts to address several longstanding technical shortcomings of SKS that to this date remain largely unaddressed.
+Besides the already mentioned concerns about the effects of recent changes in data protection laws, HAGRID also attempts to address several longstanding technical shortcomings of SKS that to this date remain largely unaddressed.
 
-In an article announcing the official launch of Hagrid at \url{https://keys.openpgp.org}, the maintainers go on addressing some of these issues. For example, it is noted that the initial choice of implementing SKS in ``unidiomatic OCaml'' has proven problematic as this has since then severely limited the number of maintainers willing to contribute to the project.
+The maintainers go on addressing some of these issues. For example, it is noted that the initial choice of implementing SKS in ``unidiomatic OCaml'' has proven problematic as this has since then severely limited the number of maintainers willing to contribute to the project.
 
-
-Further, they explain that the mental model that users may have of a PGP key server being comparable to a ``telephone book'' or indexable directory may oftentimes lead to confusion on the user side. This stems largely from the fact that implementations like SKS can effectively be seen as an append-only log of key updates without any process of verification.  
+Further, they explain that the mental model that users may have of a PGP key server being comparable to a ``telephone book'' or indexable directory may oftentimes lead to confusion on the user side. This stems largely from the fact that implementations like SKS can effectively be seen as an append-only log of key updates without any process of verification \cite{sequoia_blog}.  
 
 \paragraph{Preventing certificate flooding through verification}
-A specific example of the shortcomings of SKS is described in CITE SEQUOIA BLOG JULY 2019. 
-As laid out in the article, in July of 2019 an unknown attacker was able to upload approximately 150000 signatures to the certificate of a well-known member of the OpenPGP community, therefore ``poisoning'' said certificate. As a result, any user that accidentally downloads one of these poisoned keys from an SKS key server will suddenly have to download a surprisingly large amount of completely useless data without any means of preventing it.
+As laid out in Sequoia's developer blog \footnote{See footnote \ref{footnote}}, in July of 2019 an unknown attacker was able to upload approximately 150000 signatures to the certificate of a well-known member of the OpenPGP community, therefore ``poisoning'' said certificate. As a result, any user that accidentally downloads one of these poisoned keys from an SKS key server will suddenly have to download a surprisingly large amount of completely useless data without any means of preventing it.
 
-Arguably, this is the most important problem that Hagrid has set out to solve. The proposed solution lies in the fact that Hagrid is a \emph{verifying} key server. Specifically, that means that Hagrid will only publish identifiable information that has been confirmed by the user through a specific process. As mentioned in [CITE SEQUOIA BLOG] this also better matches the mental model of many users as described in chapter \ref{sec:hagrid_solves}.
+Arguably, this is the most important problem that HAGRID has set out to solve. The proposed solution lies in the fact that HAGRID is a \emph{verifying} key server. Specifically, that means that HAGRID will only publish identifiable information that has been confirmed by the user through a specific process. They further explain that this also better matches the mental model of many users as described earlier.
 
-In this case, verification is implemented as a simple challenge-response scheme, in which the server will send a mail to all addresses belonging to the user IDs of some uploaded key. The user may then decide to follow the link contained within the mail, which will subsequently complete the verification process for the associated user ID.
-Until the server receives this final verification, it will strip the unconfirmed user ID from its associated PGP key.
+In this case, verification is implemented as a simple challenge-response scheme, in which the server will send an email to all addresses belonging to the user IDs of some uploaded key. The user may then decide to follow the link contained within the mail, which will subsequently complete the verification process for the associated user ID.
+Until the server receives this final verification, it will strip the unconfirmed user ID from its associated PGP key. If the user decides at a later point, that he wants to revoke the verification of an identity, the same process has to be completed first \cite{sequoia_blog}.
 
-While the developers of Hagrid recognize that this mechanism doesn't provide any kind of \emph{strong} verification, they nonetheless argue that their solution at least prevents enough unsophisticated vandalism and spamming (such as the previously mentioned SKS spam attack in July of 2019), to justify this additional verification step.
+While the developers of HAGRID recognize that this mechanism doesn't provide any kind of \emph{strong} verification, they nonetheless argue that their solution at least prevents enough unsophisticated vandalism and spamming (such as the previously mentioned SKS spam attack in July of 2019), to justify this additional verification step.
 
-Additionally, Hagrid is also capable of handling large PGP keys without causing a significant slowdown of the entire system. In contrast to that, alternatives such  as GnuPG appear to come almost to a complete halt even for operations on unrelated keys as soon as any such flooded key has been imported into the keyring. 
+Additionally, HAGRID is also capable of handling large PGP keys without causing a significant slowdown of the entire system. In contrast to that, alternatives such as GnuPG appear to come almost to a complete halt even for operations on unrelated keys as soon as any such flooded key has been imported into the keyring \cite{flooding_blog}. 
 % CITE https://dev.gnupg.org/T459212#7389

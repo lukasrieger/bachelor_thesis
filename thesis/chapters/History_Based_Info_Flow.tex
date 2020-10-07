@@ -10,7 +10,7 @@ Formally, we can thus define any history \(h\) as
 \]
 where \(n\) denotes the size of the given history and any \(ev_i\) represents the \(i\)-th operation or \emph{event} in the history.
 Given that the history itself is in no way responsible for the way in which it is interpreted, we impose no requirements on the internal structure of the event type.
-\subsection{Generating histories for Hagrid}
+\subsection{Generating histories for HAGRID}
 Given our general definition of a history, we can now look at the content of histories that we use to test our model of HAGRID. 
 As described in chapter \ref{sec:hagrid_structure}, we want to be able to describe the process of verifying a given subset of valid identities belonging to a PGP key and similarly revoking these identities in a similar fashion. Note that these two operations, \emph{verifying} and \emph{revoking} identities are the central operations, that drive the dynamic declassification and reclassification of private data in our server.
 We therefore define 3 abstract types of events, that can be included in a history: 
@@ -53,9 +53,9 @@ The states of this state machine represent the privacy state after each transiti
 
 We can now generalize this state machine to support histories containing arbitrary amounts of keys and identities. Let's consider the set of state machines \(\{S_{i,k}\}\), where all state machines share their set of states and initial state with \(S\). 
 
-Given some event \(E_{i,k}\) and some state \(s \in Q\), we define \( \exists {s'} \subseteq \delta_{i',k'}(E_{i',k'},s) \) if, and only if \( \exists S_{i',k'} .\, i' = i \wedge k' = k\).
+Given some event \(E_{i,k}\) and some state \(s \in Q\), we define \( \exists {s'} \subseteq \delta_{i',k'}(E_{i',k'},s) \) if, and only if \( \exists S_{i',k'} .\, i' = i \wedge k' = k\). That is, some event \(E_{i,k}\) only ever affects a single corresponding state machine \(S_{i,k}\).
 Furthermore, it is easy to see that any event \(E(t,f)\), where \(t\) is a set of identities can also be denoted as the set \(E' = \{E_{t_i,f} | t_i \in t\} \). That means, that any event that affects multiple identities at once can be equivalently formulated as a sequence of the same event that each affects a single event from the original set.
-For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though the \mintinline{Text}{Upload} event does not specifically contain the set of identities it affects. This means, that \mintinline{Text}{Upload(k)} is equivalent to \(\{(i,k) \; \big|\; i \in \text{k.identities}\}\).
+For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though the \mintinline{Text}{Upload} event does not specifically contain the set of identities it affects. This means, that \mintinline{Text}{Upload(k)} is equivalent to \(\text{Upload}_{i,k} \; \big|\; i \in \text{k.identities}\}\).
 
 \begin{figure}[h]
     \centering
@@ -87,7 +87,7 @@ For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though th
 In order to emphasize which states support a successful key request, we included an additional state \(E\), which is only reachable by transitions marked with \(\text{Get}_{i,k}\). We can think of \(E\) as a kind of implicit error state, which tells us, that the system encountered an attempt to retrieve a key \(k\), while the state machine associated with \(k\) was still in a state, that made returning a key impossible. 
 
 This will only ever occur if the state machine is either in its initial state \(S_0\), or all state machines \(t_{k,i}\) for a given \(k\) are currently in the state \(U\).
-
+The only state that actively \emph{supports} the retrieval of a specific identity is \(C\).
 \paragraph{Determining the final states produced by a history}
 We can determine \emph{all} relevant privacy states by simply collecting the final state of each state machine after the history has been completely evaluated.
 Formally, the set of all uploaded keys can be constructed from a given history as follows:
@@ -172,8 +172,8 @@ Again, for a given \mintinline{Text}{(Identity,Key)} pair to be considered inval
     \item The pair retrieved is neither confirmed nor revoked (but has been uploaded to the server) but is still present in the retrieved server state
 \end{enumerate}
 
-Based on these two partitions of identities and key, we can now define a general constraint that determines whether the Hagrid server model only performs valid declassifications (and reclassifications). 
-Let \(H\) denote the set of all histories considered by a specific test instance. Let \(\text{Invalid}_h\) denote the set of invalid associations computed from some history \(h \in H\). We can then express that a model of Hagrid is safe, if and only if the set of invalid associations is empty for all histories that were taken into account:
+Based on these two partitions of identities and keys, we can now define a general constraint that determines whether the HAGRID server model only performs valid declassifications (and reclassifications). 
+Let \(H\) denote the set of all histories considered by a specific test instance. Let \(\text{Invalid}_h\) denote the set of invalid associations computed from some history \(h \in H\). We can then express that a model of HAGRID is safe, if and only if the set of invalid associations is empty for all histories that were taken into account:
 \[
     \forall h \in H \; .\; \text{Invalid}_h = \emptyset
 \]
@@ -223,7 +223,7 @@ From this, we can easily determine that our set of publicly accessible informati
             \node[state]            (B) [below of=A]            {$U$};
             \node[state]            (C) [below of=E]            {$C$};
             \node[state]            (E) [below of=B]            {$E$};
-            \node[state]            (V) [below of=C]            {$\epsilon$};
+            \node[state]            (V) [below of=C]            {$C$};
             
             \path   (A) edge    node    {$\text{Upload}_{id1,k1}$}  (B)
                     (B) edge    node    {$\text{Get}_{id1,k1}$}     (E)
@@ -245,4 +245,4 @@ From this, we can easily determine that our set of publicly accessible informati
     \caption{State flow of \(h_{2}\) split up into two separate state machines }
 \end{figure}
 
-As \(h_2\) contains a sound \{\mintinline{Text}{Upload(...),Verify(...)}\} sequence, the state machine associated with \(k_1\) and \(id_1\) ends in a state, that we have defined as belonging to a valid \emph{public} state. 
+As \(h_2\) contains a sound \{\mintinline{Text}{Upload(...),Verify(...)}\} sequence, the state machine associated with \(k_1\) and \(id_1\) ends in a state, that we have defined as belonging to a valid \emph{public} state. That is, an evaluation of this history would at some point produce \((id1,k1) \in C\) and therefore also \((id1,k1) \in \text{Valid}\), assuming that the server response also included \(id1,k1\).

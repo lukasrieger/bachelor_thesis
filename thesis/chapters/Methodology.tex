@@ -48,7 +48,7 @@ The datatypes \mintinline{scala}{Fingerprint} and \mintinline{scala}{KeyId} repr
 \caption{Definition of the abstract Key type}
 \end{code}
 
-Given that we only needed a high-level representation of Hagrid, our implementation does not persist internal state. Instead, the model state is simply kept as a number of maps whose elements transition between each other: 
+Given that we only needed a high-level representation of HAGRID, our implementation does not persist internal state. Instead, the model state is simply kept as a number of maps whose elements transition between each other: 
 \begin{code}
     \begin{minted}{scala}
     class Server extends HagridInterface {
@@ -66,7 +66,7 @@ Given that we only needed a high-level representation of Hagrid, our implementat
 
 \paragraph{Changing the internal server state}
 Any of the actions exposed by the \mintinline{scala}{HagridInterface} (see definition in section \ref{def:HagridInterface}) may modify these internal state maps.
-For example, we can inspect the implementation of the \mintinline{scala}{upload} method
+For example, we can inspect the implementation of the \mintinline{scala}{upload} method:
 \begin{code}
     \begin{minted}{scala}
     def upload(key: Key): Token = {
@@ -84,7 +84,7 @@ For example, we can inspect the implementation of the \mintinline{scala}{upload}
     \caption{Implementation of \mintinline{Text}{upload()}}
 \end{code}
 
-we can see that both the \mintinline{scala}{keys} map, as well as the \mintinline{scala}{uploaded} map, is being modified. Note, that once a key has been uploaded, it remains present in the corresponding map forever. Any additional modifications such as verifying or revoking an identity will then be tracked by entries in \mintinline{scala}{confirmed}.
+We can see that both the \mintinline{scala}{keys} map, as well as the \mintinline{scala}{uploaded} map, is being modified. Note, that once a key has been uploaded, it remains present in the corresponding map forever. Any additional modifications such as verifying or revoking an identity will then be tracked by entries in \mintinline{scala}{confirmed}.
 
 \paragraph{Requesting verification of an identity} In contrast to simply uploading a key to the server, verifying or revoking an identity associated with some key is a two-step process.
 For example, the process of verifying an identity consists of an initial call to \mintinline{scala}{requestVerify}:
@@ -155,13 +155,13 @@ One important difference to the verification process is that revocation happens 
 \begin{code}
     \begin{minted}{scala}
         def revoke(token: Token, identities: Set[Identity]) {
-        if (managed contains token) {
-            val fingerprint = managed(token)
-            val key = keys(fingerprint)
-            if (identities subsetOf key.identities) {
-                confirmed --= identities
+            if (managed contains token) {
+                val fingerprint = managed(token)
+                val key = keys(fingerprint)
+                if (identities subsetOf key.identities) {
+                    confirmed --= identities
+                }
             }
-        }
   }
     \end{minted}
 \end{code}
@@ -332,6 +332,9 @@ val withUploadedAndConfirmed = confirmed.foldLeft(withUploaded) {
     \caption{Adding confirmed identities to their associated key}
 \end{code}
 
+We sequentially fold over these maps in order to ensure that \mintinline{scala}{Verify} or \mintinline{scala}{Revoke} instructions that refer to non-existant or non-public keys are ignored.
+
+
 In a second step, this mapping from keys to \mintinline{text}{(Identity,Status)} tuples is compared to the state of all available identities coming from the server model.
 To this end, we collect the total server state in a \mintinline{scala}{Map[Fingerprint,Set[Identity]]}, mapping each requested key to the set of identities we received. 
 Next, we simply compare this set of identities to the corresponding set of \mintinline{text}{(Identity,Status)} tuples which we determined earlier. The result of this comparison is encoded in a \mintinline{scala}{EvalResult} type, which is a discriminated union between of the types \mintinline{scala}{Ok} and \mintinline{scala}{Mismatch}: 
@@ -362,7 +365,7 @@ Finally, all these steps are combined in a single method \mintinline{scala}{chec
 
 \subsection{Generating and verifying histories with ScalaCheck}
 \label{sec:test_approach}
-In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of Hagrid.
+In order to ensure that our dynamic testing approach covers the largest possible space of possibly valid or invalid interactions with HAGRID we were unable to rely on some handwritten (and therefore non-exhaustive) set of predetermined test cases. Instead, our goal was to be able to generate diverse kinds of histories of arbitrary length and content, which would allow us to minimize the risk of missing some obscure edge-case in the behaviour of HAGRID.
 
 \paragraph{Generating test data with ScalaCheck generators}
 We achieve this by utilizing a property-based testing approach, in which all our test cases depend on a \emph{generator} of arbitrary histories. The basic functionality for generators is provided by ScalaCheck, which exposes an abstract type \mintinline{Scala}{Gen[T]} for some type \mintinline{Scala}{T}. This type can subsequently be used as a potentially infinite source of test data, over which we can then express some universally quantified property that this data should possess.
@@ -401,7 +404,7 @@ We generate such context objects, to ensure that all events within a single hist
         } yield new Context(keyMap)
 \end{minted}
 
-The method expects an implicit parameter \mintinline{scala}{keyGen} which handles the generation of PGP keys. Adding this abstraction over the concrete key generator is beneficial because it allows us to produce histories independent from the underlying structure of the PGP keys. As we will see in chapter \ref{sec:real_hagrid}, this is particularly useful, when the requirements for PGP keys change based on whether we are testing our abstract model or the actual Hagrid implementation.
+The method expects an implicit parameter \mintinline{scala}{keyGen} which handles the generation of PGP keys. Adding this abstraction over the concrete key generator is beneficial because it allows us to produce histories independent from the underlying structure of the PGP keys. As we will see in chapter \ref{sec:real_hagrid}, this is particularly useful, when the requirements for PGP keys change based on whether we are testing our abstract model or the actual HAGRID implementation.
 
 In the case of our abstract server model, the implementation of the key generator looks as follows: 
 \begin{code}
@@ -484,7 +487,7 @@ The complete history generator then simply combines both context and event gener
 \end{code}
 
 \paragraph{Verifying generated histories}
-Given our implementation of a generator for histories, we can translate the formal condition for the validity of a Hagrid model from chapter \ref{sec:priv_condition}:
+Given our implementation of a generator for histories, we can translate the formal condition for the validity of a HAGRID model from chapter \ref{sec:priv_condition}:
 \[
     \forall h \in H \; .\; \text{Invalid}_h = \emptyset
 \]
@@ -508,7 +511,9 @@ property("CheckHagridValid") = forAll { gen: Gen[History] =>
 }
     \end{minted}
     \caption{Universally quantified validity constraint over histories}
+    \label{code:propCheck}
 \end{code}
+The property seen in code sample \ref{code:propCheck} will only succeed if the evaluation of our history tags \emph{all} identities with \mintinline{scala}{EvalResult.Ok} values.
 
 Note that instead of defining our property directly over an arbitrary history, we receive an instance of \mintinline{scala}{Gen[History]}. This allows us to define a ScalaCheck generator that in turn produces generators of histories of different lengths: 
 \begin{code}
@@ -548,5 +553,5 @@ property("CheckHagridInvalid") = forAll { gen: Gen[History] =>
     \caption{Property that tests a faulty server implementation}
 \end{code}  
 
-In this case, we create an instance of the type \mintinline{scala}{ServerOld}, which behaves the same way as the standard server implementation, except that it does not filter the identities of its keys. 
+In this case, we create an instance of the type \mintinline{scala}{ServerOld}, which behaves the same way as the standard server implementation, except that it does not filter the identities of its keys. As seen later on in chapter \ref{sec:results}, this property reliably recognizes the release of private identities.
 

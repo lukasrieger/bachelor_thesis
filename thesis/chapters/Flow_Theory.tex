@@ -89,7 +89,7 @@ To mitigate the strictness of these definitions, \citeauthor{Goguen_Meseguer_82}
      G,A :\mid G' \; \text{if } P 
 \]
 
-Applied to Hagrid: Let \(U\) be the set of all users. Let \(G,G' \subset U\) be two sets of users that are both accessing the same key \(K\). Let \(u \in G\) and \(c\) be the set of state altering operations provided by Hagrid (Verify, Revoke): 
+Applied to HAGRID: Let \(U\) be the set of all users. Let \(G,G' \subset U\) be two sets of users that are both accessing the same key \(K\). Let \(u \in G\) and \(c\) be the set of state altering operations provided by HAGRID (Verify, Revoke): 
 \[
     \forall u,c \;.\; \{u\}, \{c\} :\mid G' \text{ if not } \text{CHECK}(u,c,K),
 \]
@@ -99,8 +99,8 @@ That is, given some key K, we guarantee that a user \(u\) does not interfere wit
 In return, that also means that we explicitly permit interference by supporting declassification of formerly confidential information in such cases, where it is permissible for a user to affect the privacy state of some key \(K\).
 
 As \citeauthor{declass_dim_prin} explain in their paper \citetitle{declass_dim_prin}, the core issue therefore lies with ensuring that the release of information in these instances is actually \emph{safe}\cite{declass_dim_prin}. That is, that such a system never accidentally declassifies more information than it ought to, as that would consequently also violate its non-interference policies.
-The main challenge that one faces when trying to \emph{verify} whether Hagrid adheres to these policies, is that the set of theoretically visible identities is constantly changing and strongly depends on dynamic runtime values within the Hagrid system. 
+The main challenge that one faces when trying to \emph{verify} whether HAGRID adheres to these policies, is that the set of theoretically visible identities is constantly changing and strongly depends on dynamic runtime values within the HAGRID system. 
 While there exist some approaches like the one laid out in \citetitle{Lourenco_Caires_15} by \citeauthor{Lourenco_Caires_15}, which are based on Dependent Type Theory and allow one to formulate Information Flow types that depend on runtime values, these approaches are relatively novel and unexplored \cite{Lourenco_Caires_15}.
 
-In the following chapter, we instead present an approach to ensure the safe declassification of sensitive information during runtime that utilizes the notion of state machines similarly to \citeauthor{Goguen_Meseguer_82}. We then extend the approach in such a way, as to allow us to specify exactly what sensitive information is declassifiable (or potentially reclassifiable) by Hagrid based on history traces acting as the input to the system.
+In the following chapter, we instead present an approach to ensure the safe declassification of sensitive information during runtime that utilizes the notion of state machines similarly to \citeauthor{Goguen_Meseguer_82}. We then extend the approach in such a way, as to allow us to specify exactly what sensitive information is declassifiable (or potentially reclassifiable) by HAGRID based on history traces acting as the input to the system.
 

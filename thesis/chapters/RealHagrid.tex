@@ -1,10 +1,10 @@
-\section{Testing the real-world implementation of Hagrid}
+\section{Testing the real-world implementation of HAGRID}
 \label{sec:real_hagrid}
-Given that we have successfully developed a framework in which we can test our abstract model of Hagrid, we decided to integrate the official implementation of Hagrid into our testing efforts.
-Assuming that the maintainers of Hagrid would likely not appreciate it if their server received hundreds of spam-like calls to their server at \url{https://keys.openpgp.org/}, running our tests requires a separate instance of Hagrid to be running on the local machine.
+Given that we have successfully developed a framework in which we can test our abstract model of HAGRID, we decided to integrate the official implementation of HAGRID into our testing efforts.
+Assuming that the maintainers of HAGRID would likely not appreciate it if their server received hundreds of spam-like calls to their server at \url{https://keys.openpgp.org/}, running our tests requires a separate instance of HAGRID to be running on the local machine.
 
-\paragraph{Communicating with Hagrid}
-The main effort of integrating Hagrid into our implementation focussed on the relaying and receiving of messages between our Scala frontend and Hagrid.
+\paragraph{Communicating with HAGRID}
+The main effort of integrating HAGRID into our implementation focussed on the relaying and receiving of messages between our Scala frontend and HAGRID.
 To this end, we use \emph{Sttp}\footnote{https://sttp.softwaremill.com/en/latest/}, which is a simple library that enables us to communicate with the server through REST-full HTTP calls. The transferred data is being encoded as \emph{JSON}, for which we rely on \emph{Circe}\footnote{https://circe.github.io/circe/} as a dependency. HAGRID itself defines a specific interface, through which external applications may communicate with the PGP server. This interface, called \emph{Verifying Keyserver (VKS) Interface}\footnote{https://keys.openpgp.org/about/api}, exposes the following endpoints: 
 \begin{figure}[h]
     \begin{itemize}
@@ -14,10 +14,10 @@ To this end, we use \emph{Sttp}\footnote{https://sttp.softwaremill.com/en/latest
         \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/upload}
         \item \mintinline{text}{POST} \mintinline{text}{/vks/v1/request-verify}
     \end{itemize}
-    \caption{HTTP endpoints defined by Hagrid}
+    \caption{HTTP endpoints defined by HAGRID}
 \end{figure}
 
-In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to Hagrid via HTTP. As an example, let's look at the \mintinline{scala}{upload} method: 
+In contrast to our abstract server model outlined in chapter \ref{sec:abstract_model}, this implementation does not maintain any local state on its own. Instead, we define a new implementation of \mintinline{scala}{HagridInterface} which simply relays all method calls to HAGRID via HTTP. As an example, let's look at the \mintinline{scala}{upload} method: 
 \begin{code}
     \begin{minted}{scala}
     override def upload(key: Key): Token = {
@@ -31,18 +31,18 @@ In contrast to our abstract server model outlined in chapter \ref{sec:abstract_m
         Token(response.toOption.get.token)
         }
     \end{minted}
-    \caption{Uploading a PGP key to the real Hagrid server}
+    \caption{Uploading a PGP key to the real HAGRID server}
 \end{code}
 \label{code:hagrid_upload}
 First, we construct a \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
 The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token which we require in order to send any verification requests at a later point.
 
-Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with Hagrid. We are aware that this may cause unforeseen problems in some edge-cases, like the local Hagrid instance suddenly crashing.
+Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with HAGRID. We are aware that this may cause unforeseen problems in some edge-cases, like the local HAGRID instance suddenly crashing.
 
 \subsection{Receiving verification mails from HAGRID}
-While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world Hagrid server. During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
+While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world HAGRID server. During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
 Luckily, we discovered that HAGRID also provides an alternative mode of operation in which all email transfer is handled directly through the filesystem.
-Hagrid uses a configuration file called \mintinline{text}{Rocket.toml}, which allows us to specify a folder to be used as the destination for all outgoing Hagrid emails.   
+HAGRID uses a configuration file called \mintinline{text}{Rocket.toml}, which allows us to specify a folder to be used as the destination for all outgoing HAGRID emails.   
 Modifying the configuration file by adding the line \mintinline{text}{mail_folder=/PATH/TO/DESTINATION} therefore causes HAGRID to write all emails to a unique file in the specified folder.
 
 This allows us to simply observe the given directory and react to any file modifications within the folder.
@@ -70,7 +70,7 @@ More specifically, we define a method that blocks its execution until it has suc
         mails
     }
     \end{minted}
-    \caption{Reading Hagrid's emails by observing filesystem changes}
+    \caption{Reading HAGRID's emails by observing filesystem changes}
     \label{code:consumeMail}
 \end{code}
 
@@ -108,10 +108,34 @@ Based on this helper method, we can implement \mintinline{scala}{requestVerify},
     \caption{Requesting verification of a set of identities}
 \end{code}
 
-As one can see, we make use of a helper method \mintinline{scala}{checkResponse} which parses the server response and checks whether our verification request has had any effect. This is important because Hagrid will ignore requests for verification of already verified identities and will thus skip the process of sending an additional verification email. If we simply ignored this, \mintinline{scala}{consumeMail} would wait indefinitely for a corresponding email that will never be sent. 
+As one can see, we make use of a helper method \mintinline{scala}{checkResponse} which parses the server response and checks whether our verification request has had any effect. This is important because HAGRID will ignore requests for verification of already verified identities and will thus skip the process of sending an additional verification email. If we simply ignored this, \mintinline{scala}{consumeMail} would wait indefinitely for a corresponding email that will never be sent. 
 
+Finally, the process of revoking an identity follows the same order of steps: 
+\begin{code}
+    \begin{minted}{scala}
+    def requestManage(identity: PgpIdentity): Option[EMail] = 
+        for {
+            _ <- basicRequest
+                .post(hag("/manage"))
+                .body(Map("search_term" -> identity.email))
+                .send()
+                .body
+                .toOption
+        
+            mail <- consumeMail(1)
+                .headOption
+                .map { 
+                    case Body(fingerprint, token, identity) => 
+                        EMail("", fingerprint, token) 
+                    }
+        
+            } yield mail   
+    \end{minted}
+    \caption{Requesting the revocation of an identity}
+\end{code}
+Once again, we can then use the token contained within the returned email object for a subsequent call to \mintinline{scala}{revoke()}.
 \paragraph{Parsing plain text confirmation mails}
-To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by Hagrid in response to a confirmation request might look like this: 
+To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by HAGRID in response to a confirmation request might look like this: 
 \begin{figure}[H]
     \begin{minted}{text}
     To: <EMAIL@ADDRESS> 
@@ -129,7 +153,7 @@ To consume the emails within the selected directory and use the information cont
     Weitere Informationen findest du unter:
     http://localhost:8080/about
     \end{minted}
-    \caption{Automatically generated verification email by Hagrid}
+    \caption{Automatically generated verification email by HAGRID}
 \end{figure}
 
 We use a regular expression to parse the relevant information from these mails. This functionality is summarized in a method \mintinline{scala}{parseMail}:
@@ -157,13 +181,13 @@ We use a regular expression to parse the relevant information from these mails. 
             }
             .toSeq
     \end{minted}
-    \caption{Parsing relevant information from Hagrid emails}
+    \caption{Parsing relevant information from HAGRID emails}
 \end{code}
 
 As seen in code sample \ref{code:consumeMail}, this function is responsible for parsing the mails read by \mintinline{scala}{consumeMail} from the dedicated mail directory.
 
 \subsection{Generating valid PGP keys}
-In the context of our abstract Hagrid model we were able to rely on a simplified implementation of our PGP \mintinline{scala}{Key} type: 
+In the context of our abstract HAGRID model we were able to rely on a simplified implementation of our PGP \mintinline{scala}{Key} type: 
 \begin{minted}{scala}
 sealed trait Key {
     def armored: String
@@ -186,7 +210,7 @@ For example, we would represent \mintinline{scala}{KeyId} or \mintinline{scala}{
     }
 \end{minted}
 
-When communicating with the actual Hagrid implementation, that solution is obviously insufficient because Hagrid verifies all incoming PGP keys for proper formatting and structure. To solve this problem, we decided to implement a mechanism capable of generating valid PGP keys. 
+When communicating with the actual HAGRID implementation, that solution is obviously insufficient because HAGRID verifies all incoming PGP keys for proper formatting and structure. To solve this problem, we decided to implement a mechanism capable of generating valid PGP keys. 
 For this purpose, we use \emph{BouncyCastle}\footnote{https://www.bouncycastle.org/}, which is a Java library for cryptographic use cases.
 
 We define a new method that expects a set of identities and returns a tuple consisting of the BouncyCastle encoding of a public key and a string containing the armored key text:
@@ -213,7 +237,7 @@ Building upon this method, we can now define a new convenience method for constr
     \end{minted}
 \end{code}
 It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable. This restriction is currently implemented in the generator types mentioned in chapter \ref{sec:test_approach} which limit the amount of identities per key to a maximum value of two.
-\paragraph{Running tests against a local Hagrid instance} Given that our test approach outlined in chapter \ref{sec:test_approach} is fully agnostic towards the underlying server implementation, adding support for Hagrid only required us to adhere to the API contract given by \mintinline{scala}{HagridInterface}.
+\paragraph{Running tests against a local HAGRID instance} Given that our test approach outlined in chapter \ref{sec:test_approach} is fully agnostic towards the underlying server implementation, adding support for HAGRID only required us to adhere to the API contract given by \mintinline{scala}{HagridInterface}.
 \subsection{Initializing}
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
 In contrast to this, our high-level model of HAGRID maintains no state at all between any two separate test runs.
