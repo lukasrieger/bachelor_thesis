@@ -12,7 +12,7 @@ As outlined in one of the early developer blogs of Sequoia, concerns about the f
 \label{sec:hagrid_solves}
 Besides the already mentioned concerns about the effects of recent changes in data protection laws, Hagrid also attempts to address several longstanding technical shortcomings of SKS that to this date remain largely unaddressed.
 
-In an article announcing the official launch of Hagrid at \url{https://keys.openpgp.org}, the maintainers go on addressing some of these issues. For example, it is noted that the initial choice of implementing SKS in ``unidiomatic OCaml'' has proven problematic, as this has since then severely limited the number of maintainers willing to contribute to the project.
+In an article announcing the official launch of Hagrid at \url{https://keys.openpgp.org}, the maintainers go on addressing some of these issues. For example, it is noted that the initial choice of implementing SKS in ``unidiomatic OCaml'' has proven problematic as this has since then severely limited the number of maintainers willing to contribute to the project.
 
 
 Further, they explain that the mental model that users may have of a PGP key server being comparable to a ``telephone book'' or indexable directory may oftentimes lead to confusion on the user side. This stems largely from the fact that implementations like SKS can effectively be seen as an append-only log of key updates without any process of verification.  
@@ -26,7 +26,7 @@ Arguably, this is the most important problem that Hagrid has set out to solve. T
 In this case, verification is implemented as a simple challenge-response scheme, in which the server will send a mail to all addresses belonging to the user IDs of some uploaded key. The user may then decide to follow the link contained within the mail, which will subsequently complete the verification process for the associated user ID.
 Until the server receives this final verification, it will strip the unconfirmed user ID from its associated PGP key.
 
-While the developers of Hagrid recognize that this mechanism doesn't provide any kind of \emph{strong} verification, they nonetheless argue that their solution at least prevents enough unsophisticated vandalism and spamming (such as the previously mentioned SKS spam attack in July 2019), to justify this additional verification step.
+While the developers of Hagrid recognize that this mechanism doesn't provide any kind of \emph{strong} verification, they nonetheless argue that their solution at least prevents enough unsophisticated vandalism and spamming (such as the previously mentioned SKS spam attack in July of 2019), to justify this additional verification step.
 
 Additionally, Hagrid is also capable of handling large PGP keys without causing a significant slowdown of the entire system. In contrast to that, alternatives such  as GnuPG appear to come almost to a complete halt even for operations on unrelated keys as soon as any such flooded key has been imported into the keyring. 
 % CITE https://dev.gnupg.org/T459212#7389

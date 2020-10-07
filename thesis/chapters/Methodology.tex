@@ -15,17 +15,23 @@ A minimal representation of a secure PGP server according the the HAGRID specifi
 This set of requirements allows for a relatively direct translation into an abstract base trait: 
 \begin{code}
     \begin{minted}{scala}
-        trait HagridInterface {
-            def byEmail(identity: Identity): Option[Key]
-            def byFingerprint(fingerprint: Fingerprint): Option[Key]
-            def byKeyId(keyId: KeyId): Iterable[Key]
-            def upload(key: Key): Token
-            def requestVerify(from: Token, emails: Set[Identity]): Seq[Body]
-            def verify(token: Token)
-            def requestManage(identity: Identity): Option[EMail]
-            def revoke(token: Token, emails: Set[Identity])
-        }
-        \end{minted}
+    trait HagridInterface {
+        def upload(key: Key): Token
+
+        def byEmail(identity: Identity): Option[Key]
+        def byFingerprint(fingerprint: Fingerprint): Option[Key]
+        def byKeyId(keyId: KeyId): Iterable[Key]
+
+        
+        def requestVerify(from: Token, 
+                          emails: Set[Identity]): Seq[Body]
+        def verify(token: Token)
+
+        def requestManage(identity: Identity): Option[EMail]
+        def revoke(token: Token, 
+                   emails: Set[Identity])
+    }
+    \end{minted}
         \caption{Definition of the abstract server type}
         \label{def:HagridInterface}
 \end{code}
@@ -84,7 +90,8 @@ we can see that both the \mintinline{scala}{keys} map, as well as the \mintinlin
 For example, the process of verifying an identity consists of an initial call to \mintinline{scala}{requestVerify}:
 \begin{code}
     \begin{minted}{scala}
-    def requestVerify(from: Token, identities: Set[Identity]): Seq[Body] = {
+    def requestVerify(from: Token, 
+                      identities: Set[Identity]): Seq[Body] = {
         if (uploaded contains from) {
         val fingerprint = uploaded(from)
         val key = keys(fingerprint)
@@ -101,6 +108,7 @@ For example, the process of verifying an identity consists of an initial call to
         } else Nil
   }
     \end{minted}
+    \caption{Requesting verification of a set of identities}
 \end{code}
 The method first checks whether the given set of identities actually belongs to the key associated with the supplied token. Assuming that this is the case, we then proceed to generate confirmation emails for each separate identity. This sequence of emails is then returned to the caller.
 
@@ -115,12 +123,17 @@ In a second step, one may then proceed to call \mintinline{scala}{verify}, which
             }
   }
     \end{minted}
+    
 \end{code}
 In this case, the method expects a valid token object, which can be obtained from the mail returned by \mintinline{scala}{requestVerify()}: 
 \begin{code}
-\begin{minted}{scala}
-case class EMail(message: String, fingerprint: Fingerprint, token: Token)
-\end{minted}
+    \begin{minted}{scala}
+    case class EMail(message: String, 
+                     fingerprint: Fingerprint, 
+                     token: Token
+                    )
+    \end{minted}
+    \caption{Abstract representation of HAGRID emails}
 \end{code}
 
 \paragraph{Requesting revocation of a verified identity} The process of revoking some previously verified identities follows the same pattern. First, one must issue a call to \mintinline{scala}{requestManage()}: 
@@ -426,7 +439,8 @@ In a second step, our generator produces a random sequence of events, in which a
 \begin{code}
     \begin{minted}{Scala}
     def uploadEventGen(implicit context: Context): Gen[Event] =
-        for ((_, key) <- Gen.oneOf(context.keys)) yield Event.Upload(key)
+        for ((_, key) <- Gen.oneOf(context.keys)) 
+            yield Event.Upload(key)
 
 
     def verifyEventGen(implicit context: Context): Gen[Event] =
@@ -536,4 +550,3 @@ property("CheckHagridInvalid") = forAll { gen: Gen[History] =>
 
 In this case, we create an instance of the type \mintinline{scala}{ServerOld}, which behaves the same way as the standard server implementation, except that it does not filter the identities of its keys. 
 
-\textbf{TODO: Show output for both valid and invalid history runs!}

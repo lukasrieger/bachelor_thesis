@@ -1,3 +1,8 @@
-
 \section{Conclusion}
-In this thesis, we aimed to test 
+
+In this thesis, we have given a tailored approach to testing save declassification policies pertaining to the HAGRID system. We achieved this by introducing the notion of history traces which give us the ability to directly determine the set of public information. As evidenced by chapter \ref{sec:results}, this technique is not only capable of delivering practical results, but also relatively easy to implement.
+
+As an interesting side note, one might mention that our initial testing efforts were not based on these histories of events. Instead, we attempted to describe all interactions both on the server-side and the user-side as a system of stateful \emph{actors}, communicating with each other through a set of channels. 
+While we made some initial progress under that approach, we were unable to find a satisfactory solution to the problem of encoding abstract test cases without quite literally enumerating the exact sequence of actors \emph{and} messages between them. Additionally, we lacked a clear formalization of \emph{what} these test cases were trying to verify in the first place.
+
+In the end, our history-based approach turned out to be a much more expressive tool, allowing us to set aside specific implementation details up to the point of execution on the server, as well as giving us a scalable method for determining declassifiable information independent of the size of underlying interaction sequence.

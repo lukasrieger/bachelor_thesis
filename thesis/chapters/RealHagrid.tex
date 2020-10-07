@@ -35,13 +35,13 @@ In contrast to our abstract server model outlined in chapter \ref{sec:abstract_m
 \end{code}
 \label{code:hagrid_upload}
 First, we construct a \emph{POST}-Request which targets the \emph{VKS} endpoint responsible for uploading PGP keys. We then attach the \emph{armored} key-text as the request body and finally instruct the request to encode any eventual response as an instance of \mintinline{scala}{UploadResponse}.
-The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token, which we require in order to send any verification requests at a later point.
+The most crucial bit of information included in the \mintinline{scala}{UploadResponse} is the token which we require in order to send any verification requests at a later point.
 
 Note that our implementation at this moment does not have any robust error handling mechanism and this generally \emph{ignores} the possibility of an error occurring while communicating with Hagrid. We are aware that this may cause unforeseen problems in some edge-cases, like the local Hagrid instance suddenly crashing.
 
 \subsection{Receiving verification mails from HAGRID}
 While we were able to simulate the transmission of verification mails in an abstract way for our server model, we had no such option when dealing with the real-world Hagrid server. During the  earlier development phases, we assumed that we would be forced to provide a dummy implementation of \mintinline{bash}{sendmail}, as the documentation claimed that HAGRID would require a working \mintinline{bash}{sendmail} configuration to be available in the environment in order to send and receive emails.
-Luckily, we discovered that HAGRID also provides an alternative mode of operation, in which all email transfer is handled directly through the filesystem.
+Luckily, we discovered that HAGRID also provides an alternative mode of operation in which all email transfer is handled directly through the filesystem.
 Hagrid uses a configuration file called \mintinline{text}{Rocket.toml}, which allows us to specify a folder to be used as the destination for all outgoing Hagrid emails.   
 Modifying the configuration file by adding the line \mintinline{text}{mail_folder=/PATH/TO/DESTINATION} therefore causes HAGRID to write all emails to a unique file in the specified folder.
 
@@ -114,19 +114,20 @@ As one can see, we make use of a helper method \mintinline{scala}{checkResponse}
 To consume the emails within the selected directory and use the information contained within them, we had to parse the plain text content of said emails and extract the relevant information. In both cases of identity confirmation or revocation, these relevant bits of data would be the \mintinline{scala}{Fingerprint}, the \mintinline{scala}{Token} and the respective \mintinline{scala}{Identity} for which the email was issued. For example, a typical email issued by Hagrid in response to a confirmation request might look like this: 
 \begin{figure}[H]
     \begin{minted}{text}
-    To: <ISSUE_EMAIL@ADDRESS> 
+    To: <EMAIL@ADDRESS> 
     Hi,
     
     Dies ist eine automatische Nachricht von localhost.
     Falls dies unerwartet ist, bitte die Nachricht ignorieren.
 
     OpenPGP Schlüssel: 23B2E0C54487F50AC59134C3A1EC9765D7B25C5A 
-    Damit der Schlüssel über die Email-Adresse "<ISSUE_EMAIL@ADDRESS>" 
+    Damit der Schlüssel über die Email-Adresse "<EMAIL@ADDRESS>" 
     gefunden werden kann, klicke den folgenden Link:
     
-    http://localhost:8080/verify/vrTohvV8q552KMvARBE7foqkvGtUrfDl3iiyX9yqeOX 
+    http://localhost:8080/verify/vrTohvV8q552KMvARBE7foqkvGtUrf
     
-    Weitere Informationen findest du unter http://localhost:8080/about
+    Weitere Informationen findest du unter:
+    http://localhost:8080/about
     \end{minted}
     \caption{Automatically generated verification email by Hagrid}
 \end{figure}
@@ -135,8 +136,9 @@ We use a regular expression to parse the relevant information from these mails. 
 \begin{code}
     \begin{minted}{scala}
     val VERIFY_PATTERN: Regex = 
-        "(?s).*To: <(\\S+)>.*OpenPGP key: ||
-        (\\S+).*http://localhost:8080/verify/(\\S+).*<!doctype html>.*".r
+        """(?s).*To: <(\\S+)>.*OpenPGP key: ||
+        |(\\S+).*http://localhost:8080/verify/(\\S+).*
+        |<!doctype html>.*""".stripMargin.r
 
     def parseMail(mail: String): Seq[Body] =
         decode[HagridMail](mail)
