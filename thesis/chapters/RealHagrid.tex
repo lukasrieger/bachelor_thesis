@@ -236,7 +236,10 @@ Building upon this method, we can now define a new convenience method for constr
     }
     \end{minted}
 \end{code}
-It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable. This restriction is currently implemented in the generator types mentioned in chapter \ref{sec:test_approach} which limit the amount of identities per key to a maximum value of two.
+It should be noted though that we currently do not support the generation of keys with arbitrary amounts of identities. This is due to several unsolved problems which we encountered during development. In the end, these hurdles led to the decision that temporarily supporting a maximum amount of only \emph{two} identities is acceptable. This restriction is currently implemented in the generator types mentioned in chapter \ref{sec:test_approach} which limit the amount of identities per key to a maximum value of two. 
+
+Even with this restriction in place, running our ScalaCheck tests with a key generator that relies on this method incurs a noticeable performance penalty, with an average run time of roughly 8 minutes per standard test run.
+
 \paragraph{Running tests against a local HAGRID instance} Given that our test approach outlined in chapter \ref{sec:test_approach} is fully agnostic towards the underlying server implementation, adding support for HAGRID only required us to adhere to the API contract given by \mintinline{scala}{HagridInterface}.
 \subsection{Initializing}
 One major challenge that we faced when trying to incorporate the actual HAGRID implementation in our testing approach was the fact that HAGRID maintains internal state across several distinct instances. This is due to HAGRID persisting uploaded keys and their contents within its installation folder. 
