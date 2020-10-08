@@ -5,7 +5,7 @@ Initially, this project was not intended to be a full-fledged replacement of exi
 
 Sequoia has been in development since early 2018 and is intended to be a performant and modern implementation of the OpenPGP standard written in the Rust programming language \cite{sequoia_blog}.
 
-As outlined in one of the early developer blogs of Sequoia\footnote[1]{\label{footnote}https://sequoia-pgp.org/blog/2019/06/14/20190614-hagrid/}, concerns about the future and reliability of existing solutions like SKS and questions about how recent data protection regulations such as the GDPR would be addressed by these solutions finally lead to HAGRID evolving into a serious project aiming to provide a reliable key server implementation based on the Sequoia at its core \cite{sequoia_blog}.
+As outlined in one of the early developer blogs of Sequoia\footnote[1]{\label{footnote}https://sequoia-pgp.org/blog/2019/06/14/20190614-hagrid/}, concerns about the future and reliability of existing solutions like SKS and questions about how recent data protection regulations such as the GDPR would be addressed by these solutions finally lead to HAGRID evolving into a serious project aiming to provide a reliable key server implementation based on the Sequoia project at its core \cite{sequoia_blog}.
 
 
 \paragraph{How HAGRID avoids the mistakes of the past}
@@ -17,7 +17,7 @@ The maintainers go on addressing some of these issues. For example, it is noted 
 Further, they explain that the mental model that users may have of a PGP key server being comparable to a ``telephone book'' or indexable directory may oftentimes lead to confusion on the user side. This stems largely from the fact that implementations like SKS can effectively be seen as an append-only log of key updates without any process of verification \cite{sequoia_blog}.  
 
 \paragraph{Preventing certificate flooding through verification}
-As laid out in Sequoia's developer blog \footnote{See footnote \ref{footnote}}, in July of 2019 an unknown attacker was able to upload approximately 150000 signatures to the certificate of a well-known member of the OpenPGP community, therefore ``poisoning'' said certificate. As a result, any user that accidentally downloads one of these poisoned keys from an SKS key server will suddenly have to download a surprisingly large amount of completely useless data without any means of preventing it.
+As laid out in Sequoia's developer blog \footnote{See footnote \ref{footnote}}, in July of 2019 an unknown attacker was able to upload approximately 150000 signatures to the certificate of a well-known member of the OpenPGP community, therefore ``poisoning'' said certificate. This is made even worse by the fact that any user is capable of signing these certificates \cite{CVE_2019}. As a result, any user that accidentally downloads one of these poisoned keys from an SKS key server will suddenly have to download a surprisingly large amount of completely useless data without any means of preventing it.
 
 Arguably, this is the most important problem that HAGRID has set out to solve. The proposed solution lies in the fact that HAGRID is a \emph{verifying} key server. Specifically, that means that HAGRID will only publish identifiable information that has been confirmed by the user through a specific process. They further explain that this also better matches the mental model of many users as described earlier.
 
