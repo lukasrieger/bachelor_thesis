@@ -179,7 +179,7 @@ Let \(H\) denote the set of all histories considered by a specific test instance
 \]
 
 \paragraph{Testing both functional correctness and privacy constraints at the same time}
-During a presentation of our preliminary progress on the VerifyThis2020 challenge earlier this year in April, a member of one of the participating teams raised the question of how our approach handles a theoretically maximally secure HAGRID server, that never returns any key data of any kind. Such a system would achieve the highest possible protection of PGP keys because its behaviour would prevent it from ever leaking any information, private or otherwise. On the other hand, this behaviour would simultaneously render the server completely useless at its intended usage as a public PGP key server.
+During a presentation of our preliminary progress on the VerifyThis2020 challenge earlier this year in April \cite{VTLTC2020}, a member of one of the participating teams raised the question of how our approach handles a theoretically maximally secure HAGRID server, that never returns any key data of any kind. Such a system would achieve the highest possible protection of PGP keys because its behaviour would prevent it from ever leaking any information, private or otherwise. On the other hand, this behaviour would simultaneously render the server completely useless at its intended usage as a public PGP key server.
 
 Given our formal approach of verifying privacy constraints as outlined in this chapter, we can strictly enforce the privacy of \emph{unverified} identities, while simultaneously ensuring that the server correctly returns declassified data in all other cases, where the release of that information is actually permissible. 
 
