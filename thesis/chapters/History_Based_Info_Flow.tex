@@ -55,7 +55,7 @@ We can now generalize this state machine to support histories containing arbitra
 
 Given some event \(E_{i,k}\) and some state \(s \in Q\), we define \( \exists {s'} \subseteq \delta_{i',k'}(E_{i',k'},s) \) if, and only if \( \exists S_{i',k'} .\, i' = i \wedge k' = k\). That is, some event \(E_{i,k}\) only ever affects a single corresponding state machine \(S_{i,k}\).
 Furthermore, it is easy to see that any event \(E(t,f)\), where \(t\) is a set of identities can also be denoted as the set \(E' = \{E_{t_i,f} | t_i \in t\} \). That means, that any event that affects multiple identities at once can be equivalently formulated as a sequence of the same event that each affects a single event from the original set.
-For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though the \mintinline{Text}{Upload} event does not specifically contain the set of identities it affects. This means, that \mintinline{Text}{Upload(k)} is equivalent to \(\text{Upload}_{i,k} \; \big|\; i \in \text{k.identities}\}\).
+For the sake of consistency, we will use \(\text{Upload}_{i,k}\), even though the \mintinline{Text}{Upload} event does not specifically contain the set of identities it affects. This means, that \mintinline{Text}{Upload(k)} is equivalent to \(\{\text{Upload}_{i,k} \; \big|\; i \in \text{k.identities}\}\).
 
 \begin{figure}[h]
     \centering

@@ -63,23 +63,23 @@ In order to give a brief summary of their definition of non-interference, let us
 In this context, let \(U\) be a set whose elements denote the users of \(Q\). Additionally, let \(S\) be the set of abstract states of \(M\), while \(C\) denotes the set of ``commands'' that may cause a state transition in \(M\). Finally, let \(\text{Out}\) refer to the set of all ``outputs'' that \(Q\) may generate. 
 Given these foundational definitions, \citeauthor{Goguen_Meseguer_82} proceed to define a function \(p\): 
 
-Given a subset \(G\) of all users \(U\) and some subset \(A\) of state altering commands \(C\), let \(w\) be in \((U \times C)^*\). That is, \(w\) is an ordered sequence of pairs consisting of a user and an associated command. 
+Given a subset \(G\) of all users \(U\) and some subset \(A\) of state altering commands \(C\), let \(w\) be in \((U \times C)^*\). That is, \(w\) is an ordered sequence of pairs consisting of a user and an associated command. Additionally, let \([[w]]_u\) denote the effect that a sequence of commands has on the state of a system from the point of view of some user \(u\).
 
 Finally, let \(p_G(w)\) be equal to \(w\) excluding any pairs \((u,c)\), where \(u \in G\). Similarly, let \(p_A(w)\) be equal to \(w\) excluding any pairs \((u,c)\) where \(c \in A\). In combination, let \(p_{G,A}\) be equal to \(w\) excluding any pairs \((u,c)\) where \(u \in G\) and \(c \in A\).
 From there, \citeauthor{Goguen_Meseguer_82} derive three notions of non-interference:
 \begin{enumerate}
-    \item Non-interference between two sets of users: Given a state machine \(M\) and two sets of users \(G\) and \(G'\), we let \(G :\mid G'\) denote that \(G\) and \(G'\) are non-interfering, if and only if \[ 
+    \item Non-interference between two sets of users: Given a state machine \(M\) and two sets of users \(G\) and \(G'\), we let \(G :\mid G'\) denote that \(G\) and \(G'\) are non-interfering for all \(u \in G'\), if and only if \[ 
         [[\;w\;]]_u = [[\;p_G(w)\;]]_u  
     \]
-    That is, they are only non-interfering if the outputs caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding any element involving a user from \(G\).
-    \item Non-interference between an ability \(A\) and a set of users \(G\): Given a state machine \(M\), we let \(A :\mid G\) denote that \(A\) and \(G\) are non-interfering, if and only if \[
+    That is, they are only non-interfering if the effects caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding any element involving a user from \(G\).
+    \item Non-interference between an ability \(A\) and a set of users \(G\): Given a state machine \(M\), we let \(A :\mid G\) denote that \(A\) and \(G\) are non-interfering for all \(u \in G\), if and only if  \[
         [[\;w\;]]_u = [[\;p_A(w)\;]]_u  
     \]
-    That is, they are only non-interfering if the outputs caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding any element involving an ability from \(A\).
-    \item Non-interference between a set of users \(G\) with ability \(A\) and another set of users \(G'\): Given a state machine \(M\), we let \(A,G :\mid G'\) denote that no user from \(G\) with ability \(A\) interferes with users from \(G'\), if and only if \[
+    That is, they are only non-interfering if the effects caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding any element involving an ability from \(A\).
+    \item Non-interference between a set of users \(G\) with ability \(A\) and another set of users \(G'\): Given a state machine \(M\), we let \(A,G :\mid G'\) denote that no user from \(G\) with ability \(A\) interferes with users from \(G'\) for all \(u \in G\), if and only if \[
         [[\;w\;]]_u = [[\;p_{G,A}(w)\;]]_u   
     \]
-    That is, they are only non-interfering if the outputs caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding all elements involving a user from \(G\) and ability from \(A\).
+    That is, they are only non-interfering if the effects caused by \(w\) are equal to those produced by the subsequence of \(w\) excluding all elements involving a user from \(G\) and ability from \(A\).
 \end{enumerate}
 
 Note that all of the definitions above describe purely \emph{static} non-interference policies. That is, the non-interference policy must always hold and thus never allows any sets of users and abilities to interfere \emph{at all}. 
